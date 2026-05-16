@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Trash2, Search } from 'lucide-react';
+import { Plus, Trash2, Search, X, Image } from 'lucide-react';
 import { api } from '../utils/api';
 import { formatMoney, formatDate } from '../utils/format';
 import toast from 'react-hot-toast';
@@ -14,6 +14,7 @@ export default function Expenses() {
   const [editExpense, setEditExpense] = useState(null);
   const [filterCat, setFilterCat] = useState('');
   const [offset, setOffset] = useState(0);
+  const [lightboxImage, setLightboxImage] = useState(null);
   const limit = 20;
 
   const loadData = useCallback(async () => {
@@ -46,6 +47,13 @@ export default function Expenses() {
     loadData();
     toast.success(editExpense ? 'Dépense modifiée' : 'Dépense ajoutée');
   };
+
+  const openReceipt = (e, receiptUrl) => {
+    e.stopPropagation();
+    setLightboxImage(receiptUrl);
+  };
+
+  const apiBase = import.meta.env.DEV ? 'http://localhost:3001' : '';
 
   return (
     <div>
@@ -100,6 +108,14 @@ export default function Expenses() {
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {exp.receipt_image && (
+                  <img
+                    src={`${apiBase}/uploads/${exp.receipt_image}`}
+                    alt="Ticket"
+                    className="receipt-badge"
+                    onClick={(e) => openReceipt(e, `${apiBase}/uploads/${exp.receipt_image}`)}
+                  />
+                )}
                 <span className="expense-amount">-{formatMoney(exp.amount)}</span>
                 <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); handleDelete(exp.id); }} style={{ padding: 6, minHeight: 'auto' }}>
                   <Trash2 size={16} color="var(--danger)" />
@@ -136,6 +152,21 @@ export default function Expenses() {
           onClose={() => { setShowModal(false); setEditExpense(null); }}
           onSaved={handleSaved}
         />
+      )}
+
+      {/* Receipt Lightbox */}
+      {lightboxImage && (
+        <div className="lightbox-overlay" onClick={() => setLightboxImage(null)}>
+          <button className="lightbox-close" onClick={() => setLightboxImage(null)}>
+            <X size={24} />
+          </button>
+          <img
+            src={lightboxImage}
+            alt="Ticket de caisse"
+            className="lightbox-image"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
       )}
     </div>
   );

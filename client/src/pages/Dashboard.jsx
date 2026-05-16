@@ -84,8 +84,8 @@ export default function Dashboard() {
         <div className="balance-label">
           <Wallet size={16} />
           <span>Solde du compte</span>
-          <button className="balance-toggle" onClick={() => setShowBalance(!showBalance)} style={{ marginLeft: 'auto' }}>
-            {showBalance ? <EyeOff size={16} /> : <Eye size={16} />}
+          <button className="balance-toggle" onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); setShowBalance(s => !s); }} style={{ marginLeft: 'auto' }}>
+            {showBalance ? <EyeOff size={18} /> : <Eye size={18} />}
           </button>
         </div>
         {showBalance ? (

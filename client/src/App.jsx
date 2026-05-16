@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -37,6 +37,14 @@ function AppRoutes() {
 }
 
 export default function App() {
+  // Apply stored theme on initial mount
+  useEffect(() => {
+    const stored = localStorage.getItem('budgetvault-theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', stored);
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', stored === 'light' ? '#f1f5f9' : '#0a0a1a');
+  }, []);
+
   return (
     <BrowserRouter>
       <AuthProvider>
@@ -46,9 +54,9 @@ export default function App() {
           toastOptions={{
             duration: 3000,
             style: {
-              background: '#1a1a3e',
-              color: '#f1f5f9',
-              border: '1px solid #2a2a5a',
+              background: 'var(--bg-card)',
+              color: 'var(--text)',
+              border: '1px solid var(--border)',
               borderRadius: '12px',
               fontSize: '0.9rem',
             },

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LogOut, Lock, Calendar, Bell, BellOff, User, Plus, Trash2, X, RefreshCw, Coins } from 'lucide-react';
+import { LogOut, Lock, Calendar, Bell, BellOff, User, Plus, Trash2, X, RefreshCw, Sun, Moon } from 'lucide-react';
 import { api } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import { formatMoney, CURRENCIES } from '../utils/format';
@@ -11,6 +11,18 @@ const CURRENCY_LIST = [
   { code: 'DZD', label: 'Dinar algérien', symbol: 'د.ج', flag: '🇩🇿' },
 ];
 
+function getStoredTheme() {
+  return localStorage.getItem('budgetvault-theme') || 'dark';
+}
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('budgetvault-theme', theme);
+  // Update meta theme-color for mobile browser chrome
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', theme === 'light' ? '#f1f5f9' : '#0a0a1a');
+}
+
 export default function Settings() {
   const { user, logout, updateUser } = useAuth();
   const [recurring, setRecurring] = useState([]);
@@ -21,6 +33,7 @@ export default function Settings() {
   const [cycleDay, setCycleDay] = useState(user?.cycleStartDay || 1);
   const [currency, setCurrencyState] = useState(user?.currency || 'EUR');
   const [pushEnabled, setPushEnabled] = useState(false);
+  const [theme, setTheme] = useState(getStoredTheme());
 
   const [pwForm, setPwForm] = useState({ current: '', newPw: '', confirm: '' });
   const [recForm, setRecForm] = useState({ type: 'income', amount: '', description: '', dayOfMonth: 1, categoryId: '' });
@@ -28,6 +41,8 @@ export default function Settings() {
   useEffect(() => {
     loadData();
     checkPush();
+    // Apply stored theme on mount
+    applyTheme(getStoredTheme());
   }, []);
 
   const loadData = async () => {
@@ -60,6 +75,11 @@ export default function Settings() {
       updateUser({ currency: code });
       toast.success(`Devise changée : ${CURRENCY_LIST.find(c => c.code === code)?.label}`);
     } catch { toast.error('Erreur'); }
+  };
+
+  const handleThemeChange = (newTheme) => {
+    setTheme(newTheme);
+    applyTheme(newTheme);
   };
 
   const handlePasswordChange = async () => {
@@ -131,6 +151,25 @@ export default function Settings() {
             <div className="settings-item-label flex items-center gap-2"><User size={16} /> {user?.displayName || user?.username}</div>
             <div className="settings-item-desc">@{user?.username}</div>
           </div>
+        </div>
+      </div>
+
+      {/* Theme */}
+      <div className="section-title">Apparence</div>
+      <div className="card mb-4">
+        <div className="theme-switcher">
+          <button
+            className={`theme-option ${theme === 'dark' ? 'active' : ''}`}
+            onClick={() => handleThemeChange('dark')}
+          >
+            <Moon size={16} /> Sombre
+          </button>
+          <button
+            className={`theme-option ${theme === 'light' ? 'active' : ''}`}
+            onClick={() => handleThemeChange('light')}
+          >
+            <Sun size={16} /> Clair
+          </button>
         </div>
       </div>
 
