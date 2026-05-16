@@ -34,21 +34,27 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Auth routes (login is public, others need auth)
-const authRoutes = require('./routes/auth');
-app.use('/api/auth/login', require('./routes/auth'));
-// For authenticated auth routes
+// Auth routes — login is public, other auth routes require auth middleware
+const authRouter = require('./routes/auth');
+
+// Public auth route (login)
+app.post('/api/auth/login', (req, res, next) => {
+  req.url = '/login';
+  authRouter(req, res, next);
+});
+
+// Protected auth routes
 app.post('/api/auth/change-password', authMiddleware, (req, res, next) => {
   req.url = '/change-password';
-  authRoutes(req, res, next);
+  authRouter(req, res, next);
 });
 app.get('/api/auth/me', authMiddleware, (req, res, next) => {
   req.url = '/me';
-  authRoutes(req, res, next);
+  authRouter(req, res, next);
 });
 app.put('/api/auth/settings', authMiddleware, (req, res, next) => {
   req.url = '/settings';
-  authRoutes(req, res, next);
+  authRouter(req, res, next);
 });
 
 // Protected API routes
