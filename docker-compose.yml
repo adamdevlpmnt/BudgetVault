@@ -3,7 +3,7 @@
 # ═══════════════════════════════════════════════
 # Ce fichier tire l'image pré-construite depuis
 # GitHub Container Registry (ghcr.io).
-# Pas besoin de cloner le repo !
+# Pas besoin de cloner le repository !
 #
 # Installation :
 #   1. Créer un dossier et y placer ce fichier
