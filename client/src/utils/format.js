@@ -1,12 +1,44 @@
 /**
- * Format a number as EUR currency
+ * Currency configuration
+ */
+const CURRENCIES = {
+  EUR: { code: 'EUR', symbol: '€', locale: 'fr-FR', label: 'Euro (€)' },
+  USD: { code: 'USD', symbol: '$', locale: 'en-US', label: 'Dollar ($)' },
+  DZD: { code: 'DZD', symbol: 'د.ج', locale: 'fr-DZ', label: 'Dinar algérien (د.ج)' },
+};
+
+export { CURRENCIES };
+
+// Current currency — set from AuthContext
+let _currency = 'EUR';
+
+export function setCurrency(code) {
+  _currency = CURRENCIES[code] ? code : 'EUR';
+}
+
+export function getCurrency() {
+  return _currency;
+}
+
+/**
+ * Format a number as currency (uses the active currency)
  */
 export function formatMoney(amount) {
-  return new Intl.NumberFormat('fr-FR', {
-    style: 'currency',
-    currency: 'EUR',
-    minimumFractionDigits: 2,
-  }).format(amount || 0);
+  const cfg = CURRENCIES[_currency] || CURRENCIES.EUR;
+  try {
+    return new Intl.NumberFormat(cfg.locale, {
+      style: 'currency',
+      currency: cfg.code,
+      minimumFractionDigits: cfg.code === 'DZD' ? 0 : 2,
+      maximumFractionDigits: cfg.code === 'DZD' ? 0 : 2,
+    }).format(amount || 0);
+  } catch {
+    // Fallback for DZD in some browsers
+    const val = cfg.code === 'DZD'
+      ? Math.round(amount || 0).toLocaleString('fr-FR')
+      : (amount || 0).toLocaleString('fr-FR', { minimumFractionDigits: 2 });
+    return `${val} ${cfg.symbol}`;
+  }
 }
 
 /**

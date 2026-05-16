@@ -38,6 +38,7 @@ router.post('/login', loginLimiter, (req, res) => {
         username: user.username,
         displayName: user.display_name,
         cycleStartDay: user.cycle_start_day,
+        currency: user.currency || 'EUR',
       },
     });
   } catch (err) {
@@ -87,7 +88,7 @@ router.post('/change-password', (req, res) => {
 router.get('/me', (req, res) => {
   try {
     const user = db.prepare(
-      'SELECT id, username, display_name, cycle_start_day, created_at FROM users WHERE id = ?'
+      'SELECT id, username, display_name, cycle_start_day, currency, created_at FROM users WHERE id = ?'
     ).get(req.userId);
 
     if (!user) {
@@ -99,6 +100,7 @@ router.get('/me', (req, res) => {
       username: user.username,
       displayName: user.display_name,
       cycleStartDay: user.cycle_start_day,
+      currency: user.currency || 'EUR',
       createdAt: user.created_at,
     });
   } catch (err) {
@@ -113,7 +115,7 @@ router.get('/me', (req, res) => {
  */
 router.put('/settings', (req, res) => {
   try {
-    const { displayName, cycleStartDay } = req.body;
+    const { displayName, cycleStartDay, currency } = req.body;
 
     if (cycleStartDay !== undefined && (cycleStartDay < 1 || cycleStartDay > 28)) {
       return res.status(400).json({ error: 'Le jour de début du cycle doit être entre 1 et 28' });
@@ -130,6 +132,13 @@ router.put('/settings', (req, res) => {
       updates.push('cycle_start_day = ?');
       params.push(cycleStartDay);
     }
+    if (currency !== undefined) {
+      if (!['EUR', 'USD', 'DZD'].includes(currency)) {
+        return res.status(400).json({ error: 'Devise non supportée' });
+      }
+      updates.push('currency = ?');
+      params.push(currency);
+    }
 
     if (updates.length === 0) {
       return res.status(400).json({ error: 'Aucune modification fournie' });
@@ -141,7 +150,7 @@ router.put('/settings', (req, res) => {
     db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).run(...params);
 
     const user = db.prepare(
-      'SELECT id, username, display_name, cycle_start_day FROM users WHERE id = ?'
+      'SELECT id, username, display_name, cycle_start_day, currency FROM users WHERE id = ?'
     ).get(req.userId);
 
     res.json({
@@ -149,6 +158,7 @@ router.put('/settings', (req, res) => {
       username: user.username,
       displayName: user.display_name,
       cycleStartDay: user.cycle_start_day,
+      currency: user.currency || 'EUR',
     });
   } catch (err) {
     console.error('Update settings error:', err);

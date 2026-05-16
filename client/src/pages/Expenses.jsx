@@ -142,6 +142,6 @@ export default function Expenses() {
 }
 
 function getEmoji(icon) {
-  const m = { 'shopping-cart':'🛒','car':'🚗','home':'🏠','gamepad-2':'🎮','heart-pulse':'❤️','shirt':'👕','book-open':'📚','utensils':'🍽️','repeat':'🔄','package':'📦','tag':'🏷️' };
+  const m = { 'shopping-cart':'🛒','car':'🚗','home':'🏠','gamepad-2':'🎮','heart-pulse':'❤️','shirt':'👕','book-open':'📚','utensils':'🍽️','repeat':'🔄','package':'📦','tag':'🏷️','beef':'🥩','fish':'🐟','apple':'🍎' };
   return m[icon] || '💰';
 }

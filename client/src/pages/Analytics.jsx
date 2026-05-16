@@ -3,15 +3,18 @@ import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearSca
 import { Doughnut, Bar } from 'react-chartjs-2';
 import { PieChart, BarChart3, Calendar } from 'lucide-react';
 import { api } from '../utils/api';
-import { formatMoney, cycleName } from '../utils/format';
+import { useAuth } from '../context/AuthContext';
+import { formatMoney, formatDate, formatDateFull, cycleName, getCurrency, CURRENCIES } from '../utils/format';
 import toast from 'react-hot-toast';
 
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement);
 
 export default function Analytics() {
+  const { user } = useAuth();
   const [categoryData, setCategoryData] = useState(null);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [cycleDates, setCycleDates] = useState({ startDate: '', endDate: '' });
   const [dateRange, setDateRange] = useState({ startDate: '', endDate: '' });
   const [useCustomRange, setUseCustomRange] = useState(false);
 
@@ -28,6 +31,12 @@ export default function Analytics() {
       ]);
       setCategoryData(catData);
       setHistory(histData);
+
+      // Store cycle dates from the API response (default = current cycle)
+      if (!params.startDate && catData.startDate && catData.endDate) {
+        setCycleDates({ startDate: catData.startDate, endDate: catData.endDate });
+        setDateRange({ startDate: catData.startDate, endDate: catData.endDate });
+      }
     } catch { toast.error('Erreur de chargement'); }
     finally { setLoading(false); }
   };
@@ -41,9 +50,11 @@ export default function Analytics() {
 
   const resetFilter = () => {
     setUseCustomRange(false);
-    setDateRange({ startDate: '', endDate: '' });
+    setDateRange({ startDate: cycleDates.startDate, endDate: cycleDates.endDate });
     loadData();
   };
+
+  const currencySymbol = CURRENCIES[getCurrency()]?.symbol || '€';
 
   const pieData = categoryData ? {
     labels: categoryData.categories.map(c => c.name),
@@ -107,9 +118,16 @@ export default function Analytics() {
     },
     scales: {
       x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 11 } } },
-      y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748b', callback: v => `${v}€` } },
+      y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748b', callback: v => `${v}${currencySymbol}` } },
     },
   };
+
+  // Period label for subtitle
+  const periodLabel = useCustomRange
+    ? `${formatDateFull(dateRange.startDate)} → ${formatDateFull(dateRange.endDate)}`
+    : cycleDates.startDate
+      ? `Cycle : ${formatDateFull(cycleDates.startDate)} → ${formatDateFull(cycleDates.endDate)}`
+      : '';
 
   if (loading) {
     return (
@@ -124,14 +142,16 @@ export default function Analytics() {
     <div>
       <div className="page-header">
         <h1 className="page-title">Statistiques</h1>
-        <p className="page-subtitle">Analyse de vos dépenses</p>
+        <p className="page-subtitle">{periodLabel}</p>
       </div>
 
       {/* Date Filter */}
       <div className="card mb-4">
         <div className="flex items-center gap-2 mb-2">
           <Calendar size={16} color="var(--primary-light)" />
-          <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>Période personnalisée</span>
+          <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>
+            {useCustomRange ? 'Période personnalisée' : 'Période du cycle en cours'}
+          </span>
         </div>
         <div className="flex gap-2">
           <input className="input" type="date" value={dateRange.startDate} onChange={e => setDateRange(p => ({ ...p, startDate: e.target.value }))} style={{ flex: 1 }} />

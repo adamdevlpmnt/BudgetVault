@@ -199,6 +199,7 @@ function getCategoryEmoji(icon) {
     'coffee': '☕', 'gift': '🎁', 'plane': '✈️', 'music': '🎵',
     'smartphone': '📱', 'zap': '⚡', 'droplet': '💧', 'baby': '👶',
     'dog': '🐕', 'dumbbell': '💪', 'graduation-cap': '🎓', 'wrench': '🔧',
+    'beef': '🥩', 'fish': '🐟', 'apple': '🍎',
   };
   return map[icon] || '💰';
 }

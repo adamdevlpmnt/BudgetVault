@@ -701,6 +701,66 @@ textarea.input { min-height: 80px; resize: vertical; }
   margin-top: 2px;
 }
 
+/* ═══ Currency Picker ═══ */
+.currency-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.currency-option {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--border);
+  background: var(--bg-elevated);
+  cursor: pointer;
+  transition: var(--transition);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.currency-option:hover {
+  border-color: var(--border-light);
+  background: var(--bg-hover);
+}
+
+.currency-option.active {
+  border-color: var(--primary);
+  background: rgba(99,102,241,0.08);
+}
+
+.currency-flag {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.currency-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.currency-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+.currency-symbol {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.currency-check {
+  color: var(--primary-light);
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
 /* ═══ Filter Bar ═══ */
 .filter-bar {
   display: flex;

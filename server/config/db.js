@@ -33,6 +33,7 @@ function initDatabase() {
       password_hash TEXT NOT NULL,
       display_name TEXT,
       cycle_start_day INTEGER DEFAULT 1 CHECK(cycle_start_day >= 1 AND cycle_start_day <= 28),
+      currency TEXT DEFAULT 'EUR' CHECK(currency IN ('EUR', 'USD', 'DZD')),
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -123,6 +124,14 @@ function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_cycles_user ON cycles(user_id, cycle_key);
   `);
 
+  // Migration: add currency column if missing (for existing databases)
+  try {
+    db.prepare('SELECT currency FROM users LIMIT 1').get();
+  } catch {
+    db.exec('ALTER TABLE users ADD COLUMN currency TEXT DEFAULT \'EUR\'');
+    console.log('✅ Migration: added currency column');
+  }
+
   // Seed default admin user if not exists
   const existingAdmin = db.prepare('SELECT id FROM users WHERE username = ?').get('admin');
   if (!existingAdmin) {
@@ -142,15 +151,18 @@ function initDatabase() {
     );
     const defaultCategories = [
       ['Alimentation', '#ef4444', 'shopping-cart', 1],
-      ['Transport', '#3b82f6', 'car', 2],
-      ['Logement', '#8b5cf6', 'home', 3],
-      ['Loisirs', '#f59e0b', 'gamepad-2', 4],
-      ['Santé', '#10b981', 'heart-pulse', 5],
-      ['Vêtements', '#ec4899', 'shirt', 6],
-      ['Éducation', '#06b6d4', 'book-open', 7],
-      ['Restauration', '#f97316', 'utensils', 8],
-      ['Abonnements', '#6366f1', 'repeat', 9],
-      ['Divers', '#64748b', 'package', 10],
+      ['Viande', '#b91c1c', 'beef', 2],
+      ['Poisson', '#0ea5e9', 'fish', 3],
+      ['Fruits & Légumes', '#22c55e', 'apple', 4],
+      ['Transport', '#3b82f6', 'car', 5],
+      ['Logement', '#8b5cf6', 'home', 6],
+      ['Loisirs', '#f59e0b', 'gamepad-2', 7],
+      ['Santé', '#10b981', 'heart-pulse', 8],
+      ['Vêtements', '#ec4899', 'shirt', 9],
+      ['Éducation', '#06b6d4', 'book-open', 10],
+      ['Restauration', '#f97316', 'utensils', 11],
+      ['Abonnements', '#6366f1', 'repeat', 12],
+      ['Divers', '#64748b', 'package', 13],
     ];
     for (const [name, color, icon, order] of defaultCategories) {
       insertCategory.run(userId, name, color, icon, order);

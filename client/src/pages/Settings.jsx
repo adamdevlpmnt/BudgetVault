@@ -1,9 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { LogOut, Lock, Calendar, Bell, BellOff, User, Plus, Trash2, X, RefreshCw } from 'lucide-react';
+import { LogOut, Lock, Calendar, Bell, BellOff, User, Plus, Trash2, X, RefreshCw, Coins } from 'lucide-react';
 import { api } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
-import { formatMoney } from '../utils/format';
+import { formatMoney, CURRENCIES } from '../utils/format';
 import toast from 'react-hot-toast';
+
+const CURRENCY_LIST = [
+  { code: 'EUR', label: 'Euro', symbol: '€', flag: '🇪🇺' },
+  { code: 'USD', label: 'Dollar US', symbol: '$', flag: '🇺🇸' },
+  { code: 'DZD', label: 'Dinar algérien', symbol: 'د.ج', flag: '🇩🇿' },
+];
 
 export default function Settings() {
   const { user, logout, updateUser } = useAuth();
@@ -13,6 +19,7 @@ export default function Settings() {
   const [showRecurringModal, setShowRecurringModal] = useState(false);
   const [editRec, setEditRec] = useState(null);
   const [cycleDay, setCycleDay] = useState(user?.cycleStartDay || 1);
+  const [currency, setCurrencyState] = useState(user?.currency || 'EUR');
   const [pushEnabled, setPushEnabled] = useState(false);
 
   const [pwForm, setPwForm] = useState({ current: '', newPw: '', confirm: '' });
@@ -43,6 +50,15 @@ export default function Settings() {
       await api.updateSettings({ cycleStartDay: day });
       updateUser({ cycleStartDay: day });
       toast.success('Jour de cycle mis à jour');
+    } catch { toast.error('Erreur'); }
+  };
+
+  const handleCurrencyChange = async (code) => {
+    setCurrencyState(code);
+    try {
+      await api.updateSettings({ currency: code });
+      updateUser({ currency: code });
+      toast.success(`Devise changée : ${CURRENCY_LIST.find(c => c.code === code)?.label}`);
     } catch { toast.error('Erreur'); }
   };
 
@@ -100,6 +116,8 @@ export default function Settings() {
     catch { toast.error('Erreur'); }
   };
 
+  const currencySymbol = CURRENCY_LIST.find(c => c.code === currency)?.symbol || '€';
+
   return (
     <div>
       <div className="page-header">
@@ -113,6 +131,27 @@ export default function Settings() {
             <div className="settings-item-label flex items-center gap-2"><User size={16} /> {user?.displayName || user?.username}</div>
             <div className="settings-item-desc">@{user?.username}</div>
           </div>
+        </div>
+      </div>
+
+      {/* Currency */}
+      <div className="section-title">Devise</div>
+      <div className="card mb-4">
+        <div className="currency-picker">
+          {CURRENCY_LIST.map(c => (
+            <button
+              key={c.code}
+              className={`currency-option ${currency === c.code ? 'active' : ''}`}
+              onClick={() => handleCurrencyChange(c.code)}
+            >
+              <span className="currency-flag">{c.flag}</span>
+              <div className="currency-details">
+                <span className="currency-name">{c.label}</span>
+                <span className="currency-symbol">{c.symbol}</span>
+              </div>
+              {currency === c.code && <span className="currency-check">✓</span>}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -220,7 +259,7 @@ export default function Settings() {
               </div>
             </div>
             <div className="input-group"><label>Description</label><input className="input" value={recForm.description} onChange={e => setRecForm(f => ({ ...f, description: e.target.value }))} placeholder="Ex: Salaire" /></div>
-            <div className="input-group"><label>Montant (€)</label><input className="input input-amount" type="number" step="0.01" value={recForm.amount} onChange={e => setRecForm(f => ({ ...f, amount: e.target.value }))} /></div>
+            <div className="input-group"><label>Montant ({currencySymbol})</label><input className="input input-amount" type="number" step="0.01" value={recForm.amount} onChange={e => setRecForm(f => ({ ...f, amount: e.target.value }))} /></div>
             <div className="input-group">
               <label>Jour du mois (1-28)</label>
               <input className="input" type="number" min="1" max="28" value={recForm.dayOfMonth} onChange={e => setRecForm(f => ({ ...f, dayOfMonth: parseInt(e.target.value) || 1 }))} />

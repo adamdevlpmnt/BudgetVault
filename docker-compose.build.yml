@@ -1,19 +1,16 @@
 # ═══════════════════════════════════════════════
-# BudgetVault — docker-compose d'installation
+# BudgetVault — docker-compose BUILD LOCAL
 # ═══════════════════════════════════════════════
-# Ce fichier tire l'image pré-construite depuis
-# GitHub Container Registry (ghcr.io).
-# Pas besoin de cloner le repo !
+# Utilise ce fichier si tu veux construire l'image
+# toi-même depuis le code source.
 #
-# Installation :
-#   1. Créer un dossier et y placer ce fichier
-#   2. Créer un fichier .env (voir plus bas)
-#   3. docker compose up -d
+# Usage :
+#   docker compose -f docker-compose.build.yml up -d --build
 # ═══════════════════════════════════════════════
 
 services:
   budgetvault:
-    image: ghcr.io/adamdevlpmnt/budgetvault:latest
+    build: .
     container_name: budgetvault
     restart: unless-stopped
     ports:

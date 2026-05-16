@@ -1,12 +1,18 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { api } from '../utils/api';
+import { setCurrency } from '../utils/format';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
     const stored = localStorage.getItem('budgetvault_user');
-    return stored ? JSON.parse(stored) : null;
+    if (stored) {
+      const u = JSON.parse(stored);
+      setCurrency(u.currency || 'EUR');
+      return u;
+    }
+    return null;
   });
   const [loading, setLoading] = useState(true);
 
@@ -15,6 +21,7 @@ export function AuthProvider({ children }) {
     if (token) {
       api.getMe().then(u => {
         setUser(u);
+        setCurrency(u.currency || 'EUR');
         localStorage.setItem('budgetvault_user', JSON.stringify(u));
       }).catch(() => {
         localStorage.removeItem('budgetvault_token');
@@ -30,6 +37,7 @@ export function AuthProvider({ children }) {
     const data = await api.login(username, password);
     localStorage.setItem('budgetvault_token', data.token);
     localStorage.setItem('budgetvault_user', JSON.stringify(data.user));
+    setCurrency(data.user.currency || 'EUR');
     setUser(data.user);
     return data;
   };
@@ -42,6 +50,7 @@ export function AuthProvider({ children }) {
 
   const updateUser = (updates) => {
     const updated = { ...user, ...updates };
+    if (updates.currency) setCurrency(updates.currency);
     setUser(updated);
     localStorage.setItem('budgetvault_user', JSON.stringify(updated));
   };

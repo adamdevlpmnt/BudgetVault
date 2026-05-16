@@ -4,9 +4,9 @@ import { api } from '../utils/api';
 import toast from 'react-hot-toast';
 
 const COLORS = ['#ef4444','#f97316','#f59e0b','#84cc16','#10b981','#06b6d4','#3b82f6','#6366f1','#8b5cf6','#ec4899','#64748b','#78716c'];
-const ICONS = ['shopping-cart','car','home','gamepad-2','heart-pulse','shirt','book-open','utensils','repeat','package','coffee','gift','plane','music','smartphone','zap','droplet','baby','dog','dumbbell','graduation-cap','wrench','tag'];
+const ICONS = ['shopping-cart','beef','fish','apple','car','home','gamepad-2','heart-pulse','shirt','book-open','utensils','repeat','package','coffee','gift','plane','music','smartphone','zap','droplet','baby','dog','dumbbell','graduation-cap','wrench','tag'];
 
-const EMOJI_MAP = { 'shopping-cart':'🛒','car':'🚗','home':'🏠','gamepad-2':'🎮','heart-pulse':'❤️','shirt':'👕','book-open':'📚','utensils':'🍽️','repeat':'🔄','package':'📦','tag':'🏷️','coffee':'☕','gift':'🎁','plane':'✈️','music':'🎵','smartphone':'📱','zap':'⚡','droplet':'💧','baby':'👶','dog':'🐕','dumbbell':'💪','graduation-cap':'🎓','wrench':'🔧' };
+const EMOJI_MAP = { 'shopping-cart':'🛒','car':'🚗','home':'🏠','gamepad-2':'🎮','heart-pulse':'❤️','shirt':'👕','book-open':'📚','utensils':'🍽️','repeat':'🔄','package':'📦','tag':'🏷️','coffee':'☕','gift':'🎁','plane':'✈️','music':'🎵','smartphone':'📱','zap':'⚡','droplet':'💧','baby':'👶','dog':'🐕','dumbbell':'💪','graduation-cap':'🎓','wrench':'🔧','beef':'🥩','fish':'🐟','apple':'🍎' };
 
 export default function Categories() {
   const [categories, setCategories] = useState([]);
