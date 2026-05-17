@@ -22,6 +22,8 @@ export default function ExpenseModal({ categories, onClose, onSaved, expense }) 
   const getReceiptUrl = (img) => {
     if (!img) return null;
     if (img.startsWith('http') || img.startsWith('blob:')) return img;
+    // img already contains /uploads/filename from the server
+    if (img.startsWith('/uploads/')) return `${apiBase}${img}`;
     return `${apiBase}/uploads/${img}`;
   };
 
@@ -62,7 +64,7 @@ export default function ExpenseModal({ categories, onClose, onSaved, expense }) 
           <form onSubmit={handleSubmit}>
             <div className="input-group">
               <label>Montant ({currencySymbol})</label>
-              <input className="input input-amount" type="number" step="0.01" min="0.01" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" autoFocus required />
+              <input className="input input-amount" type="number" inputMode="decimal" step="0.01" min="0.01" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" autoFocus required />
             </div>
 
             <div className="input-group">

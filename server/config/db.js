@@ -132,6 +132,17 @@ function initDatabase() {
     console.log('✅ Migration: added currency column');
   }
 
+  // Migration: rename 'Administrateur' display name to 'Adam'
+  try {
+    const adminUser = db.prepare('SELECT id, display_name FROM users WHERE username = ?').get('admin');
+    if (adminUser && adminUser.display_name === 'Administrateur') {
+      db.prepare('UPDATE users SET display_name = ? WHERE id = ?').run('Adam', adminUser.id);
+      console.log('✅ Migration: renamed Administrateur to Adam');
+    }
+  } catch (e) {
+    // Ignore if migration fails
+  }
+
   // Seed default admin user if not exists
   const existingAdmin = db.prepare('SELECT id FROM users WHERE username = ?').get('admin');
   if (!existingAdmin) {
@@ -139,7 +150,7 @@ function initDatabase() {
     const insertUser = db.prepare(
       'INSERT INTO users (username, password_hash, display_name, cycle_start_day) VALUES (?, ?, ?, ?)'
     );
-    const result = insertUser.run('admin', passwordHash, 'Administrateur', 1);
+    const result = insertUser.run('admin', passwordHash, 'Adam', 1);
     const userId = result.lastInsertRowid;
 
     // Create initial budget record

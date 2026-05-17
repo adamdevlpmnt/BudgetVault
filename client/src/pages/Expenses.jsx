@@ -110,10 +110,10 @@ export default function Expenses() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 {exp.receipt_image && (
                   <img
-                    src={`${apiBase}/uploads/${exp.receipt_image}`}
+                    src={exp.receipt_image.startsWith('/uploads/') ? `${apiBase}${exp.receipt_image}` : `${apiBase}/uploads/${exp.receipt_image}`}
                     alt="Ticket"
                     className="receipt-badge"
-                    onClick={(e) => openReceipt(e, `${apiBase}/uploads/${exp.receipt_image}`)}
+                    onClick={(e) => openReceipt(e, exp.receipt_image.startsWith('/uploads/') ? `${apiBase}${exp.receipt_image}` : `${apiBase}/uploads/${exp.receipt_image}`)}
                   />
                 )}
                 <span className="expense-amount">-{formatMoney(exp.amount)}</span>

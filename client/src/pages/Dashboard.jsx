@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Plus, TrendingDown, Calendar, Wallet, ArrowDownCircle, Edit3 } from 'lucide-react';
+import { Eye, EyeOff, Plus, Wallet, ArrowDownCircle, Edit3, ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react';
 import { api } from '../utils/api';
 import { formatMoney, formatDate, today } from '../utils/format';
 import { useAuth } from '../context/AuthContext';
@@ -14,24 +14,53 @@ export default function Dashboard() {
   const [summary, setSummary] = useState(null);
   const [recentExpenses, setRecentExpenses] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [showBalance, setShowBalance] = useState(true);
+  const [showBalance, setShowBalance] = useState(false);
   const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [showBalanceEdit, setShowBalanceEdit] = useState(false);
   const [newBalance, setNewBalance] = useState('');
   const [loading, setLoading] = useState(true);
+  const [monthComparison, setMonthComparison] = useState(null);
 
   const loadData = useCallback(async () => {
     try {
-      const [budgetData, summaryData, expensesData, cats] = await Promise.all([
+      const [budgetData, summaryData, expensesData, cats, historyData] = await Promise.all([
         api.getBudget(),
         api.getSummary(),
         api.getExpenses({ limit: 5 }),
         api.getCategories(),
+        api.getHistory(2),
       ]);
       setBalance(budgetData.balance);
       setSummary(summaryData);
       setRecentExpenses(expensesData.expenses);
       setCategories(cats);
+
+      // Calculate month comparison
+      if (historyData && historyData.length >= 2) {
+        const current = historyData[0];
+        const previous = historyData[1];
+        const diff = current.totalExpenses - previous.totalExpenses;
+        const percentage = previous.totalExpenses > 0
+          ? ((diff / previous.totalExpenses) * 100).toFixed(1)
+          : 0;
+        setMonthComparison({
+          currentTotal: current.totalExpenses,
+          previousTotal: previous.totalExpenses,
+          diff,
+          percentage: parseFloat(percentage),
+          currentLabel: current.cycleKey,
+          previousLabel: previous.cycleKey,
+        });
+      } else if (historyData && historyData.length === 1) {
+        setMonthComparison({
+          currentTotal: historyData[0].totalExpenses,
+          previousTotal: 0,
+          diff: historyData[0].totalExpenses,
+          percentage: 0,
+          currentLabel: historyData[0].cycleKey,
+          previousLabel: null,
+        });
+      }
     } catch (err) {
       toast.error('Erreur de chargement');
     } finally {
@@ -108,7 +137,7 @@ export default function Dashboard() {
             </div>
             <div className="input-group">
               <label>Nouveau solde (€)</label>
-              <input className="input input-amount" type="number" step="0.01" value={newBalance} onChange={e => setNewBalance(e.target.value)} autoFocus />
+              <input className="input input-amount" type="number" inputMode="decimal" step="0.01" value={newBalance} onChange={e => setNewBalance(e.target.value)} autoFocus />
             </div>
             <button className="btn btn-primary btn-block" onClick={handleBalanceUpdate}>Mettre à jour</button>
           </div>
@@ -142,6 +171,51 @@ export default function Dashboard() {
           <div className="stat-label">Moy./jour</div>
         </div>
       </div>
+
+      {/* Month Comparison */}
+      {monthComparison && monthComparison.previousLabel && (
+        <div className="card mt-4" style={{ padding: 16 }}>
+          <div className="flex items-center gap-2 mb-2">
+            {monthComparison.diff > 0 ? (
+              <ArrowUpRight size={18} color="var(--danger-light)" />
+            ) : monthComparison.diff < 0 ? (
+              <ArrowDownRight size={18} color="var(--success-light)" />
+            ) : (
+              <Minus size={18} color="var(--text-muted)" />
+            )}
+            <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>Comparaison mensuelle</span>
+          </div>
+          <div className="flex items-center justify-between" style={{ gap: 12 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em', marginBottom: 4 }}>Mois précédent</div>
+              <div style={{ fontSize: '1.1rem', fontWeight: 700 }}>{formatMoney(monthComparison.previousTotal)}</div>
+            </div>
+            <div style={{
+              padding: '6px 14px',
+              borderRadius: 20,
+              fontSize: '0.85rem',
+              fontWeight: 700,
+              background: monthComparison.diff > 0 ? 'rgba(239,68,68,0.12)' : monthComparison.diff < 0 ? 'rgba(16,185,129,0.12)' : 'rgba(100,116,139,0.12)',
+              color: monthComparison.diff > 0 ? 'var(--danger-light)' : monthComparison.diff < 0 ? 'var(--success-light)' : 'var(--text-muted)',
+            }}>
+              {monthComparison.diff > 0 ? '+' : ''}{monthComparison.percentage}%
+            </div>
+            <div style={{ flex: 1, textAlign: 'right' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em', marginBottom: 4 }}>Mois actuel</div>
+              <div style={{ fontSize: '1.1rem', fontWeight: 700 }}>{formatMoney(monthComparison.currentTotal)}</div>
+            </div>
+          </div>
+          <div style={{ marginTop: 10, fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center' }}>
+            {monthComparison.diff < 0 ? (
+              <span style={{ color: 'var(--success-light)' }}>📉 Vous avez économisé {formatMoney(Math.abs(monthComparison.diff))} par rapport au mois dernier</span>
+            ) : monthComparison.diff > 0 ? (
+              <span style={{ color: 'var(--danger-light)' }}>📈 Vous avez dépensé {formatMoney(monthComparison.diff)} de plus que le mois dernier</span>
+            ) : (
+              <span>Même niveau de dépenses que le mois dernier</span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Recent Expenses */}
       <div className="section-title mt-4">Dernières dépenses</div>

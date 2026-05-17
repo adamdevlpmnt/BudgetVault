@@ -66,8 +66,11 @@ app.use('/api/analytics', authMiddleware, require('./routes/analytics'));
 app.use('/api/upload', authMiddleware, require('./routes/upload'));
 app.use('/api/push', authMiddleware, require('./routes/push'));
 
-// Serve uploaded files
-app.use('/uploads', express.static(UPLOADS_DIR));
+// Serve uploaded files (with explicit CORP header for cross-origin image loading)
+app.use('/uploads', (req, res, next) => {
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  next();
+}, express.static(UPLOADS_DIR));
 
 // Serve React build in production
 const clientBuildPath = path.join(__dirname, '..', 'client', 'dist');

@@ -298,10 +298,10 @@ export default function Settings() {
               </div>
             </div>
             <div className="input-group"><label>Description</label><input className="input" value={recForm.description} onChange={e => setRecForm(f => ({ ...f, description: e.target.value }))} placeholder="Ex: Salaire" /></div>
-            <div className="input-group"><label>Montant ({currencySymbol})</label><input className="input input-amount" type="number" step="0.01" value={recForm.amount} onChange={e => setRecForm(f => ({ ...f, amount: e.target.value }))} /></div>
+            <div className="input-group"><label>Montant ({currencySymbol})</label><input className="input input-amount" type="number" inputMode="decimal" step="0.01" value={recForm.amount} onChange={e => setRecForm(f => ({ ...f, amount: e.target.value }))} /></div>
             <div className="input-group">
               <label>Jour du mois (1-28)</label>
-              <input className="input" type="number" min="1" max="28" value={recForm.dayOfMonth} onChange={e => setRecForm(f => ({ ...f, dayOfMonth: parseInt(e.target.value) || 1 }))} />
+              <input className="input" type="number" inputMode="numeric" min="1" max="28" value={recForm.dayOfMonth} onChange={e => setRecForm(f => ({ ...f, dayOfMonth: parseInt(e.target.value) || 1 }))} />
             </div>
             {recForm.type === 'expense' && (
               <div className="input-group">
