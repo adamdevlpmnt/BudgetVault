@@ -77,7 +77,7 @@ router.get('/', (req, res) => {
  */
 router.post('/', (req, res) => {
   try {
-    const { amount, description, note, date, categoryId, receiptImage } = req.body;
+    const { amount, description, note, date, categoryId, receiptImage, type } = req.body;
 
     if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
       return res.status(400).json({ error: 'Montant invalide' });
@@ -86,6 +86,7 @@ router.post('/', (req, res) => {
       return res.status(400).json({ error: 'Date requise' });
     }
 
+    const entryType = type === 'income' ? 'income' : 'expense';
     const numAmount = parseFloat(amount);
 
     // Get user's cycle start day
@@ -93,8 +94,8 @@ router.post('/', (req, res) => {
     const cycleKey = getCycleKey(date, user.cycle_start_day);
 
     const result = db.prepare(
-      `INSERT INTO expenses (user_id, category_id, amount, description, note, date, receipt_image, cycle_key)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO expenses (user_id, category_id, amount, description, note, date, receipt_image, cycle_key, type)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       req.userId,
       categoryId || null,
@@ -103,12 +104,18 @@ router.post('/', (req, res) => {
       note || '',
       date,
       receiptImage || null,
-      cycleKey
+      cycleKey,
+      entryType
     );
 
-    // Auto-deduct from balance
-    db.prepare('UPDATE budget SET balance = balance - ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?')
-      .run(numAmount, req.userId);
+    // Income adds to balance, expense deducts
+    if (entryType === 'income') {
+      db.prepare('UPDATE budget SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?')
+        .run(numAmount, req.userId);
+    } else {
+      db.prepare('UPDATE budget SET balance = balance - ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?')
+        .run(numAmount, req.userId);
+    }
 
     const expense = db.prepare(
       'SELECT e.*, c.name as category_name, c.color as category_color, c.icon as category_icon FROM expenses e LEFT JOIN categories c ON e.category_id = c.id WHERE e.id = ?'
@@ -134,9 +141,10 @@ router.put('/:id', (req, res) => {
 
     const existing = db.prepare('SELECT * FROM expenses WHERE id = ? AND user_id = ?').get(id, req.userId);
     if (!existing) {
-      return res.status(404).json({ error: 'Dépense non trouvée' });
+      return res.status(404).json({ error: 'Entrée non trouvée' });
     }
 
+    const entryType = existing.type || 'expense';
     const newAmount = amount !== undefined ? parseFloat(amount) : existing.amount;
     const amountDiff = newAmount - existing.amount;
 
@@ -162,10 +170,15 @@ router.put('/:id', (req, res) => {
       req.userId
     );
 
-    // Adjust balance if amount changed
+    // Adjust balance if amount changed — income adds, expense deducts
     if (amountDiff !== 0) {
-      db.prepare('UPDATE budget SET balance = balance - ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?')
-        .run(amountDiff, req.userId);
+      if (entryType === 'income') {
+        db.prepare('UPDATE budget SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?')
+          .run(amountDiff, req.userId);
+      } else {
+        db.prepare('UPDATE budget SET balance = balance - ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?')
+          .run(amountDiff, req.userId);
+      }
     }
 
     const expense = db.prepare(
@@ -191,18 +204,24 @@ router.delete('/:id', (req, res) => {
 
     const existing = db.prepare('SELECT * FROM expenses WHERE id = ? AND user_id = ?').get(id, req.userId);
     if (!existing) {
-      return res.status(404).json({ error: 'Dépense non trouvée' });
+      return res.status(404).json({ error: 'Entrée non trouvée' });
     }
 
     db.prepare('DELETE FROM expenses WHERE id = ? AND user_id = ?').run(id, req.userId);
 
-    // Restore balance
-    db.prepare('UPDATE budget SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?')
-      .run(existing.amount, req.userId);
+    // Restore balance — reverse the original operation
+    const entryType = existing.type || 'expense';
+    if (entryType === 'income') {
+      db.prepare('UPDATE budget SET balance = balance - ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?')
+        .run(existing.amount, req.userId);
+    } else {
+      db.prepare('UPDATE budget SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?')
+        .run(existing.amount, req.userId);
+    }
 
     const budget = db.prepare('SELECT balance FROM budget WHERE user_id = ?').get(req.userId);
 
-    res.json({ message: 'Dépense supprimée', newBalance: budget.balance });
+    res.json({ message: 'Entrée supprimée', newBalance: budget.balance });
   } catch (err) {
     console.error('Delete expense error:', err);
     res.status(500).json({ error: 'Erreur serveur' });

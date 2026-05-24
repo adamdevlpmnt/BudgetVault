@@ -131,9 +131,10 @@ Vault/
 - `amount` REAL — Montant
 - `description` TEXT — Description
 - `note` TEXT — Note optionnelle
-- `date` DATE — Date de la dépense
+- `date` DATE — Date de la dépense/revenu
 - `receipt_image` TEXT — Chemin image ticket
 - `cycle_key` TEXT — Clé du cycle (ex: "2026-05")
+- `type` TEXT — 'income' ou 'expense' (défaut: 'expense')
 
 ### Table `recurring`
 - `id` INTEGER PK

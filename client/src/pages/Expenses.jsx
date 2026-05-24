@@ -32,11 +32,12 @@ export default function Expenses() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  const handleDelete = async (id) => {
-    if (!confirm('Supprimer cette dépense ?')) return;
+  const handleDelete = async (id, type) => {
+    const label = type === 'income' ? 'ce revenu' : 'cette dépense';
+    if (!confirm(`Supprimer ${label} ?`)) return;
     try {
       await api.deleteExpense(id);
-      toast.success('Dépense supprimée');
+      toast.success(type === 'income' ? 'Revenu supprimé' : 'Dépense supprimée');
       loadData();
     } catch { toast.error('Erreur'); }
   };
@@ -45,7 +46,7 @@ export default function Expenses() {
     setShowModal(false);
     setEditExpense(null);
     loadData();
-    toast.success(editExpense ? 'Dépense modifiée' : 'Dépense ajoutée');
+    toast.success(editExpense ? 'Entrée modifiée' : 'Entrée ajoutée');
   };
 
   const openReceipt = (e, receiptUrl) => {
@@ -58,7 +59,7 @@ export default function Expenses() {
   return (
     <div>
       <div className="page-header">
-        <h1 className="page-title">Dépenses</h1>
+        <h1 className="page-title">Transactions</h1>
         <p className="page-subtitle">{total} transaction{total > 1 ? 's' : ''}</p>
       </div>
 
@@ -94,21 +95,23 @@ export default function Expenses() {
             <p>Aucune dépense trouvée</p>
           </div>
         ) : (
-          expenses.map(exp => (
+          expenses.map(exp => {
+            const isIncome = exp.type === 'income';
+            return (
             <div key={exp.id} className="expense-item" onClick={() => { setEditExpense(exp); setShowModal(true); }}>
-              <div className="expense-icon" style={{ background: (exp.category_color || '#64748b') + '20' }}>
-                <span style={{ fontSize: '1.2rem' }}>{getEmoji(exp.category_icon)}</span>
+              <div className="expense-icon" style={{ background: isIncome ? 'rgba(16,185,129,0.15)' : (exp.category_color || '#64748b') + '20' }}>
+                <span style={{ fontSize: '1.2rem' }}>{isIncome ? '💵' : getEmoji(exp.category_icon)}</span>
               </div>
               <div className="expense-info">
-                <div className="expense-desc">{exp.description || exp.category_name || 'Dépense'}</div>
+                <div className="expense-desc">{exp.description || (isIncome ? 'Revenu' : (exp.category_name || 'Dépense'))}</div>
                 <div className="expense-meta">
                   {formatDate(exp.date)}
-                  {exp.category_name && ` • ${exp.category_name}`}
-                  {exp.receipt_image && ' 📎'}
+                  {isIncome ? ' • Revenu' : (exp.category_name && ` • ${exp.category_name}`)}
+                  {!isIncome && exp.receipt_image && ' 📎'}
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                {exp.receipt_image && (
+                {!isIncome && exp.receipt_image && (
                   <img
                     src={exp.receipt_image.startsWith('/uploads/') ? `${apiBase}${exp.receipt_image}` : `${apiBase}/uploads/${exp.receipt_image}`}
                     alt="Ticket"
@@ -116,13 +119,14 @@ export default function Expenses() {
                     onClick={(e) => openReceipt(e, exp.receipt_image.startsWith('/uploads/') ? `${apiBase}${exp.receipt_image}` : `${apiBase}/uploads/${exp.receipt_image}`)}
                   />
                 )}
-                <span className="expense-amount">-{formatMoney(exp.amount)}</span>
-                <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); handleDelete(exp.id); }} style={{ padding: 6, minHeight: 'auto' }}>
+                <span className={`expense-amount ${isIncome ? 'income' : ''}`}>{isIncome ? '+' : '-'}{formatMoney(exp.amount)}</span>
+                <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); handleDelete(exp.id, exp.type); }} style={{ padding: 6, minHeight: 'auto' }}>
                   <Trash2 size={16} color="var(--danger)" />
                 </button>
               </div>
             </div>
-          ))
+            );
+          })
         )}
       </div>
 

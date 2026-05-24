@@ -487,6 +487,66 @@ textarea.input { min-height: 80px; resize: vertical; }
   cursor: pointer;
 }
 
+/* ═══ Modal Tabs (Dépense / Revenu) ═══ */
+.modal-tabs {
+  display: flex;
+  background: var(--bg-elevated);
+  border-radius: 12px;
+  padding: 4px;
+  margin-bottom: 20px;
+  gap: 4px;
+  border: 1px solid var(--border);
+}
+
+.modal-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.modal-tab.active.expense-active {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--danger-light);
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.15);
+}
+
+.modal-tab.active.income-active {
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--success-light);
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.15);
+}
+
+/* ═══ Success Button ═══ */
+.btn-success {
+  background: linear-gradient(135deg, var(--success), #059669);
+  color: white;
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.3);
+}
+.btn-success:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35); }
+.btn-success:active { transform: scale(0.97); }
+
+/* ═══ Income Amount Input ═══ */
+.input-amount-income {
+  color: var(--success-light) !important;
+}
+.input-amount-income:focus {
+  border-color: var(--success) !important;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15) !important;
+}
+
 /* ═══ Expense Item ═══ */
 .expense-item {
   display: flex;

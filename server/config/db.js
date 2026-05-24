@@ -132,6 +132,14 @@ function initDatabase() {
     console.log('✅ Migration: added currency column');
   }
 
+  // Migration: add 'type' column to expenses table (income vs expense)
+  try {
+    db.prepare('SELECT type FROM expenses LIMIT 1').get();
+  } catch {
+    db.exec("ALTER TABLE expenses ADD COLUMN type TEXT NOT NULL DEFAULT 'expense'");
+    console.log('✅ Migration: added type column to expenses');
+  }
+
   // Migration: rename 'Administrateur' display name to 'Adam'
   try {
     const adminUser = db.prepare('SELECT id, display_name FROM users WHERE username = ?').get('admin');

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Plus, Wallet, ArrowDownCircle, Edit3, ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react';
+import { Eye, EyeOff, Plus, Wallet, ArrowDownCircle, ArrowUpCircle, Edit3, ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react';
 import { api } from '../utils/api';
 import { formatMoney, formatDate, today } from '../utils/format';
 import { useAuth } from '../context/AuthContext';
@@ -81,10 +81,10 @@ export default function Dashboard() {
     } catch { toast.error('Erreur'); }
   };
 
-  const handleExpenseAdded = () => {
+  const handleExpenseAdded = (type) => {
     setShowExpenseModal(false);
     loadData();
-    toast.success('Dépense ajoutée');
+    toast.success(type === 'income' ? 'Revenu ajouté' : 'Dépense ajoutée');
   };
 
   if (loading) {
@@ -217,30 +217,38 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Recent Expenses */}
-      <div className="section-title mt-4">Dernières dépenses</div>
+      {/* Recent Activities */}
+      <div className="section-title mt-4">Dernières activités</div>
       <div className="card">
         {recentExpenses.length === 0 ? (
           <div className="empty-state">
             <ArrowDownCircle size={40} />
-            <p>Aucune dépense</p>
-            <p style={{ fontSize: '0.8rem', marginTop: 4 }}>Ajoutez votre première dépense !</p>
+            <p>Aucune activité</p>
+            <p style={{ fontSize: '0.8rem', marginTop: 4 }}>Ajoutez votre première entrée !</p>
           </div>
         ) : (
-          recentExpenses.map(exp => (
-            <div key={exp.id} className="expense-item" onClick={() => navigate('/expenses')}>
-              <div className="expense-icon" style={{ background: (exp.category_color || '#64748b') + '20' }}>
-                <span style={{ fontSize: '1.2rem' }}>
-                  {getCategoryEmoji(exp.category_icon)}
-                </span>
+          recentExpenses.map(exp => {
+            const isIncome = exp.type === 'income';
+            return (
+              <div key={exp.id} className="expense-item" onClick={() => navigate('/expenses')}>
+                <div className="expense-icon" style={{ background: isIncome ? 'rgba(16,185,129,0.15)' : (exp.category_color || '#64748b') + '20' }}>
+                  <span style={{ fontSize: '1.2rem' }}>
+                    {isIncome ? '💵' : getCategoryEmoji(exp.category_icon)}
+                  </span>
+                </div>
+                <div className="expense-info">
+                  <div className="expense-desc">{exp.description || (isIncome ? 'Revenu' : (exp.category_name || 'Dépense'))}</div>
+                  <div className="expense-meta">
+                    {formatDate(exp.date)}
+                    {isIncome ? ' • Revenu' : (exp.category_name ? ` • ${exp.category_name}` : ' • Sans catégorie')}
+                  </div>
+                </div>
+                <div className={`expense-amount ${isIncome ? 'income' : ''}`}>
+                  {isIncome ? '+' : '-'}{formatMoney(exp.amount)}
+                </div>
               </div>
-              <div className="expense-info">
-                <div className="expense-desc">{exp.description || exp.category_name || 'Dépense'}</div>
-                <div className="expense-meta">{formatDate(exp.date)} • {exp.category_name || 'Sans catégorie'}</div>
-              </div>
-              <div className="expense-amount">-{formatMoney(exp.amount)}</div>
-            </div>
-          ))
+            );
+          })
         )}
         {recentExpenses.length > 0 && (
           <button className="btn btn-ghost btn-block btn-sm mt-3" onClick={() => navigate('/expenses')}>
