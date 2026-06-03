@@ -10,7 +10,7 @@ const router = express.Router();
 router.get('/', (req, res) => {
   try {
     const categories = db.prepare(
-      'SELECT * FROM categories WHERE user_id = ? ORDER BY sort_order ASC, name ASC'
+      'SELECT * FROM categories WHERE user_id = ? AND deleted_at IS NULL ORDER BY sort_order ASC, name ASC'
     ).all(req.userId);
 
     res.json(categories);
@@ -38,7 +38,7 @@ router.post('/', (req, res) => {
     ).get(req.userId);
 
     const result = db.prepare(
-      'INSERT INTO categories (user_id, name, color, icon, custom_icon_path, sort_order) VALUES (?, ?, ?, ?, ?, ?)'
+      "INSERT INTO categories (user_id, name, color, icon, custom_icon_path, sort_order, updated_at) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))"
     ).run(
       req.userId,
       name.trim(),
@@ -73,7 +73,8 @@ router.put('/:id', (req, res) => {
 
     db.prepare(
       `UPDATE categories SET
-        name = ?, color = ?, icon = ?, custom_icon_path = ?, sort_order = ?
+        name = ?, color = ?, icon = ?, custom_icon_path = ?, sort_order = ?,
+        updated_at = datetime('now')
        WHERE id = ? AND user_id = ?`
     ).run(
       name !== undefined ? name.trim() : existing.name,
@@ -102,17 +103,19 @@ router.delete('/:id', (req, res) => {
   try {
     const { id } = req.params;
 
-    const existing = db.prepare('SELECT * FROM categories WHERE id = ? AND user_id = ?').get(id, req.userId);
+    const existing = db.prepare('SELECT * FROM categories WHERE id = ? AND user_id = ? AND deleted_at IS NULL').get(id, req.userId);
     if (!existing) {
       return res.status(404).json({ error: 'Catégorie non trouvée' });
     }
 
     // Check if category is used by expenses
     const usageCount = db.prepare(
-      'SELECT COUNT(*) as count FROM expenses WHERE category_id = ? AND user_id = ?'
+      'SELECT COUNT(*) as count FROM expenses WHERE category_id = ? AND user_id = ? AND deleted_at IS NULL'
     ).get(id, req.userId);
 
-    db.prepare('DELETE FROM categories WHERE id = ? AND user_id = ?').run(id, req.userId);
+    db.prepare(
+      "UPDATE categories SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ? AND user_id = ?"
+    ).run(id, req.userId);
 
     res.json({ message: 'Catégorie supprimée', expensesAffected: usageCount.count });
   } catch (err) {

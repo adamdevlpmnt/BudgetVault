@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { LogOut, Lock, Calendar, Bell, BellOff, User, Plus, Trash2, X, RefreshCw, Sun, Moon } from 'lucide-react';
-import { api } from '../utils/api';
+import { offlineApi as api } from '../utils/offlineApi.js';
 import { useAuth } from '../context/AuthContext';
 import { formatMoney, CURRENCIES } from '../utils/format';
 import toast from 'react-hot-toast';

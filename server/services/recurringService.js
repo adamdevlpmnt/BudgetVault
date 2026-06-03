@@ -12,7 +12,7 @@ function processRecurring() {
   const todayStr = today.toISOString().split('T')[0];
 
   const items = db.prepare(
-    'SELECT r.*, u.cycle_start_day FROM recurring r JOIN users u ON r.user_id = u.id WHERE r.is_active = 1 AND r.day_of_month = ? AND (r.last_applied IS NULL OR r.last_applied < ?)'
+    'SELECT r.*, u.cycle_start_day FROM recurring r JOIN users u ON r.user_id = u.id WHERE r.is_active = 1 AND r.deleted_at IS NULL AND r.day_of_month = ? AND (r.last_applied IS NULL OR r.last_applied < ?)'
   ).all(dayOfMonth, todayStr);
 
   for (const item of items) {
@@ -23,14 +23,14 @@ function processRecurring() {
       } else {
         const cycleKey = getCycleKey(todayStr, item.cycle_start_day);
         db.prepare(
-          'INSERT INTO expenses (user_id, category_id, amount, description, date, cycle_key) VALUES (?, ?, ?, ?, ?, ?)'
+          'INSERT INTO expenses (user_id, category_id, amount, description, date, cycle_key, updated_at) VALUES (?, ?, ?, ?, ?, ?, datetime(\'now\'))'
         ).run(item.user_id, item.category_id, item.amount, `[Auto] ${item.description}`, todayStr, cycleKey);
 
         db.prepare('UPDATE budget SET balance = balance - ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?')
           .run(item.amount, item.user_id);
       }
 
-      db.prepare('UPDATE recurring SET last_applied = ? WHERE id = ?').run(todayStr, item.id);
+      db.prepare('UPDATE recurring SET last_applied = ?, updated_at = datetime(\'now\') WHERE id = ?').run(todayStr, item.id);
       console.log(`✅ Recurring applied: ${item.type} ${item.amount}€ for user ${item.user_id}`);
     } catch (err) {
       console.error(`❌ Recurring error for item ${item.id}:`, err);

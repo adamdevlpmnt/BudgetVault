@@ -8,7 +8,7 @@ router.get('/', (req, res) => {
     const recurring = db.prepare(
       `SELECT r.*, c.name as category_name, c.color as category_color, c.icon as category_icon
        FROM recurring r LEFT JOIN categories c ON r.category_id = c.id
-       WHERE r.user_id = ? ORDER BY r.type ASC, r.day_of_month ASC`
+       WHERE r.user_id = ? AND r.deleted_at IS NULL ORDER BY r.type ASC, r.day_of_month ASC`
     ).all(req.userId);
     res.json(recurring);
   } catch (err) {
@@ -26,7 +26,7 @@ router.post('/', (req, res) => {
     if (!dayOfMonth || dayOfMonth < 1 || dayOfMonth > 28) return res.status(400).json({ error: 'Jour invalide (1-28)' });
 
     const result = db.prepare(
-      'INSERT INTO recurring (user_id, type, amount, description, category_id, day_of_month) VALUES (?, ?, ?, ?, ?, ?)'
+      "INSERT INTO recurring (user_id, type, amount, description, category_id, day_of_month, updated_at) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))"
     ).run(req.userId, type, parseFloat(amount), description.trim(), categoryId || null, dayOfMonth);
 
     const item = db.prepare(
@@ -44,11 +44,11 @@ router.put('/:id', (req, res) => {
   try {
     const { id } = req.params;
     const { type, amount, description, categoryId, dayOfMonth, isActive } = req.body;
-    const existing = db.prepare('SELECT * FROM recurring WHERE id = ? AND user_id = ?').get(id, req.userId);
+    const existing = db.prepare('SELECT * FROM recurring WHERE id = ? AND user_id = ? AND deleted_at IS NULL').get(id, req.userId);
     if (!existing) return res.status(404).json({ error: 'Non trouvé' });
 
     db.prepare(
-      `UPDATE recurring SET type=?, amount=?, description=?, category_id=?, day_of_month=?, is_active=? WHERE id=? AND user_id=?`
+      `UPDATE recurring SET type=?, amount=?, description=?, category_id=?, day_of_month=?, is_active=?, updated_at=datetime('now') WHERE id=? AND user_id=?`
     ).run(
       type || existing.type, amount ? parseFloat(amount) : existing.amount,
       description !== undefined ? description.trim() : existing.description,
@@ -71,9 +71,11 @@ router.put('/:id', (req, res) => {
 router.delete('/:id', (req, res) => {
   try {
     const { id } = req.params;
-    const existing = db.prepare('SELECT * FROM recurring WHERE id = ? AND user_id = ?').get(id, req.userId);
+    const existing = db.prepare('SELECT * FROM recurring WHERE id = ? AND user_id = ? AND deleted_at IS NULL').get(id, req.userId);
     if (!existing) return res.status(404).json({ error: 'Non trouvé' });
-    db.prepare('DELETE FROM recurring WHERE id = ? AND user_id = ?').run(id, req.userId);
+    db.prepare(
+      "UPDATE recurring SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ? AND user_id = ?"
+    ).run(id, req.userId);
     res.json({ message: 'Supprimé' });
   } catch (err) {
     console.error('Delete recurring error:', err);

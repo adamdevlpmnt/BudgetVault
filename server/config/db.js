@@ -151,6 +151,62 @@ function initDatabase() {
     // Ignore if migration fails
   }
 
+  // Migration: add updated_at column to expenses
+  try {
+    db.prepare('SELECT updated_at FROM expenses LIMIT 1').get();
+  } catch {
+    db.exec("ALTER TABLE expenses ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP");
+    db.exec("UPDATE expenses SET updated_at = created_at WHERE updated_at IS NULL");
+    console.log('✅ Migration: added updated_at column to expenses');
+  }
+
+  // Migration: add deleted_at column to expenses (soft-delete for sync)
+  try {
+    db.prepare('SELECT deleted_at FROM expenses LIMIT 1').get();
+  } catch {
+    db.exec('ALTER TABLE expenses ADD COLUMN deleted_at DATETIME');
+    console.log('✅ Migration: added deleted_at column to expenses');
+  }
+
+  // Migration: add updated_at column to categories
+  try {
+    db.prepare('SELECT updated_at FROM categories LIMIT 1').get();
+  } catch {
+    db.exec("ALTER TABLE categories ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP");
+    db.exec("UPDATE categories SET updated_at = created_at WHERE updated_at IS NULL");
+    console.log('✅ Migration: added updated_at column to categories');
+  }
+
+  // Migration: add deleted_at column to categories (soft-delete for sync)
+  try {
+    db.prepare('SELECT deleted_at FROM categories LIMIT 1').get();
+  } catch {
+    db.exec('ALTER TABLE categories ADD COLUMN deleted_at DATETIME');
+    console.log('✅ Migration: added deleted_at column to categories');
+  }
+
+  // Migration: add updated_at column to recurring
+  try {
+    db.prepare('SELECT updated_at FROM recurring LIMIT 1').get();
+  } catch {
+    db.exec("ALTER TABLE recurring ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP");
+    db.exec("UPDATE recurring SET updated_at = created_at WHERE updated_at IS NULL");
+    console.log('✅ Migration: added updated_at column to recurring');
+  }
+
+  // Migration: add deleted_at column to recurring (soft-delete for sync)
+  try {
+    db.prepare('SELECT deleted_at FROM recurring LIMIT 1').get();
+  } catch {
+    db.exec('ALTER TABLE recurring ADD COLUMN deleted_at DATETIME');
+    console.log('✅ Migration: added deleted_at column to recurring');
+  }
+
+  // Create index for sync queries
+  db.exec('CREATE INDEX IF NOT EXISTS idx_expenses_updated ON expenses(user_id, updated_at)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_categories_updated ON categories(user_id, updated_at)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_recurring_updated ON recurring(user_id, updated_at)');
+
   // Seed default admin user if not exists
   const existingAdmin = db.prepare('SELECT id FROM users WHERE username = ?').get('admin');
   if (!existingAdmin) {

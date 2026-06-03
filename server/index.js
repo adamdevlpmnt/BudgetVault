@@ -65,6 +65,7 @@ app.use('/api/recurring', authMiddleware, require('./routes/recurring'));
 app.use('/api/analytics', authMiddleware, require('./routes/analytics'));
 app.use('/api/upload', authMiddleware, require('./routes/upload'));
 app.use('/api/push', authMiddleware, require('./routes/push'));
+app.use('/api/sync', authMiddleware, require('./routes/sync'));
 
 // Serve uploaded files (with explicit CORP header for cross-origin image loading)
 app.use('/uploads', (req, res, next) => {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Plus, Wallet, ArrowDownCircle, ArrowUpCircle, Edit3, ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react';
-import { api } from '../utils/api';
+import { offlineApi as api } from '../utils/offlineApi.js';
 import { formatMoney, formatDate, today } from '../utils/format';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';

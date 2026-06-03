@@ -1085,3 +1085,149 @@ textarea.input { min-height: 80px; resize: vertical; }
   color: white;
 }
 
+/* ═══ Sync Status Bar ═══ */
+@keyframes slideDown {
+  from { transform: translateY(-100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes syncSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes syncPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.sync-bar {
+  position: sticky;
+  top: 0;
+  z-index: 1500;
+  animation: slideDown 0.3s ease;
+}
+
+.sync-bar__content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.sync-bar__icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.sync-bar__text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sync-bar__retry {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.2);
+  color: inherit;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sync-bar__retry:hover {
+  background: rgba(255,255,255,0.3);
+}
+
+/* State colors */
+.sync-bar--offline {
+  background: linear-gradient(135deg, #d97706, #b45309);
+  color: #fef3c7;
+}
+
+.sync-bar--syncing {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: #dbeafe;
+}
+
+.sync-bar--error {
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  color: #fee2e2;
+}
+
+.sync-bar--synced {
+  background: linear-gradient(135deg, #059669, #047857);
+  color: #d1fae5;
+}
+
+.sync-bar--pending {
+  background: linear-gradient(135deg, #d97706, #b45309);
+  color: #fef3c7;
+}
+
+/* Spinner animation for syncing icon */
+.sync-spinner {
+  animation: syncSpin 1s linear infinite;
+}
+
+/* ═══ Sync Dot (navbar indicator) ═══ */
+.sync-dot {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  z-index: 10;
+  transition: background 0.3s ease;
+}
+
+.sync-dot--ok {
+  background: #10b981;
+}
+
+.sync-dot--offline {
+  background: #f59e0b;
+  animation: syncPulse 2s ease-in-out infinite;
+}
+
+.sync-dot--syncing {
+  background: #3b82f6;
+  animation: syncPulse 1s ease-in-out infinite;
+}
+
+.sync-dot--pending {
+  background: #f59e0b;
+}
+
+.sync-dot--error {
+  background: #ef4444;
+  animation: syncPulse 1.5s ease-in-out infinite;
+}
+
+/* ═══ Pending Sync Badge ═══ */
+.pending-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  font-size: 0.65rem;
+  font-weight: 600;
+  margin-left: 8px;
+}
+

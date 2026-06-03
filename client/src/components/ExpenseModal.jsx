@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { X, Camera, ZoomIn, ArrowDownCircle, ArrowUpCircle } from 'lucide-react';
-import { api } from '../utils/api';
+import { offlineApi as api } from '../utils/offlineApi.js';
 import { today, getCurrency, CURRENCIES } from '../utils/format';
 import toast from 'react-hot-toast';
 

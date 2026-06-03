@@ -123,6 +123,9 @@ Vault/
 - `icon` TEXT — Nom d'icône Lucide
 - `custom_icon_path` TEXT — Chemin icône uploadée
 - `sort_order` INTEGER — Ordre d'affichage
+- `created_at` DATETIME — Date création
+- `updated_at` DATETIME — Dernière modification (sync)
+- `deleted_at` DATETIME — Suppression logique (soft-delete)
 
 ### Table `expenses`
 - `id` INTEGER PK
@@ -135,6 +138,9 @@ Vault/
 - `receipt_image` TEXT — Chemin image ticket
 - `cycle_key` TEXT — Clé du cycle (ex: "2026-05")
 - `type` TEXT — 'income' ou 'expense' (défaut: 'expense')
+- `created_at` DATETIME — Date création
+- `updated_at` DATETIME — Dernière modification (sync)
+- `deleted_at` DATETIME — Suppression logique (soft-delete)
 
 ### Table `recurring`
 - `id` INTEGER PK
@@ -146,6 +152,9 @@ Vault/
 - `day_of_month` INTEGER (1-28) — Jour d'application
 - `is_active` INTEGER — Actif/Inactif
 - `last_applied` DATE — Dernière application
+- `created_at` DATETIME — Date création
+- `updated_at` DATETIME — Dernière modification (sync)
+- `deleted_at` DATETIME — Suppression logique (soft-delete)
 
 ### Table `cycles`
 - `id` INTEGER PK
@@ -160,6 +169,11 @@ Vault/
 - `user_id` INTEGER FK → users
 - `subscription` JSON — Objet PushSubscription
 - `created_at` DATETIME
+
+### Indexes (sync)
+- `idx_expenses_updated` ON expenses(user_id, updated_at)
+- `idx_categories_updated` ON categories(user_id, updated_at)
+- `idx_recurring_updated` ON recurring(user_id, updated_at)
 
 ---
 
@@ -184,7 +198,7 @@ Vault/
 | GET | `/api/expenses` | Liste des dépenses (filtres: cycle, date, catégorie) |
 | POST | `/api/expenses` | Ajouter une dépense |
 | PUT | `/api/expenses/:id` | Modifier |
-| DELETE | `/api/expenses/:id` | Supprimer |
+| DELETE | `/api/expenses/:id` | Supprimer (soft-delete) |
 
 ### Categories
 | Méthode | Route | Description |
@@ -192,7 +206,7 @@ Vault/
 | GET | `/api/categories` | Liste des catégories |
 | POST | `/api/categories` | Créer |
 | PUT | `/api/categories/:id` | Modifier |
-| DELETE | `/api/categories/:id` | Supprimer |
+| DELETE | `/api/categories/:id` | Supprimer (soft-delete) |
 
 ### Recurring
 | Méthode | Route | Description |
@@ -200,7 +214,13 @@ Vault/
 | GET | `/api/recurring` | Liste des récurrents |
 | POST | `/api/recurring` | Créer |
 | PUT | `/api/recurring/:id` | Modifier |
-| DELETE | `/api/recurring/:id` | Supprimer |
+| DELETE | `/api/recurring/:id` | Supprimer (soft-delete) |
+
+### Sync (Offline-First)
+| Méthode | Route | Description |
+|---------|-------|-------------|
+| GET | `/api/sync?since=&fullSync=` | Pull des changements serveur |
+| POST | `/api/sync` | Push des opérations locales |
 
 ### Analytics
 | Méthode | Route | Description |
@@ -221,6 +241,105 @@ Vault/
 | POST | `/api/push/subscribe` | S'abonner aux notifications |
 | DELETE | `/api/push/unsubscribe` | Se désabonner |
 | GET | `/api/push/vapid-key` | Clé publique VAPID |
+
+---
+
+## 📡 Architecture Offline-First
+
+### Vue d'ensemble
+
+L'application fonctionne en mode **Offline-First** : toutes les opérations sont d'abord enregistrées localement dans IndexedDB, puis synchronisées avec le serveur lorsque la connexion est disponible.
+
+```
+┌─ Client (PWA) ────────────────────────────────────┐
+│                                                     │
+│  offlineApi.js ← point d'entrée unique             │
+│    ├── En ligne ? → API serveur + cache IndexedDB   │
+│    └── Hors ligne ? → IndexedDB + file sync queue   │
+│                                                     │
+│  syncEngine.js ← synchronisation bidirectionnelle   │
+│    ├── Pull : GET /api/sync (incrémental/complet)   │
+│    ├── Push : POST /api/sync (opérations en lot)    │
+│    └── Auto-sync toutes les 30s + reconnexion       │
+│                                                     │
+│  offlineDb.js ← IndexedDB (idb v8)                 │
+│    ├── expenses, categories, recurring, budget      │
+│    ├── syncQueue (opérations en attente)             │
+│    └── metadata (timestamps de sync)                │
+│                                                     │
+│  SyncContext.jsx ← état React global                │
+│    └── isOnline, syncStatus, pendingCount            │
+│                                                     │
+│  SyncStatusBar.jsx ← indicateur visuel              │
+│    └── Barre colorée + dot dans la navbar           │
+└─────────────────────────────────────────────────────┘
+         ↕ /api/sync (GET/POST)
+┌─ Serveur ──────────────────────────────────────────┐
+│  routes/sync.js ← endpoint de synchronisation       │
+│    ├── Pull incrémental (updated_at > since)        │
+│    ├── Push transactionnel (db.transaction())       │
+│    └── Résolution conflits (LWW server-wins)        │
+│                                                     │
+│  Soft-delete sur expenses, categories, recurring    │
+│    └── deleted_at au lieu de DELETE réel             │
+└─────────────────────────────────────────────────────┘
+```
+
+### Fichiers Offline (Client)
+
+| Fichier | Rôle |
+|---------|------|
+| `utils/offlineDb.js` | Couche d'abstraction IndexedDB (CRUD, bulk, sync queue) |
+| `utils/syncEngine.js` | Moteur de synchronisation bidirectionnelle (pull-push) |
+| `utils/offlineApi.js` | Wrapper offline-first de l'API (remplace api.js dans les pages) |
+| `context/SyncContext.jsx` | React Context pour l'état de sync global |
+| `components/SyncStatusBar.jsx` | Barre de statut visuelle (offline/syncing/error/synced) |
+
+### Fichiers Offline (Serveur)
+
+| Fichier | Modification |
+|---------|-------------|
+| `routes/sync.js` | **Nouveau** — GET/POST /api/sync |
+| `config/db.js` | Migrations : updated_at, deleted_at, indexes |
+| `routes/expenses.js` | Soft-delete, transactions atomiques, updated_at |
+| `routes/categories.js` | Soft-delete, updated_at |
+| `routes/recurring.js` | Soft-delete, updated_at |
+| `routes/analytics.js` | Exclure les enregistrements soft-deleted |
+| `services/recurringService.js` | Exclure soft-deleted, ajouter updated_at |
+
+### Stratégie de Synchronisation
+
+1. **Pull** : Le client demande au serveur les changements depuis le dernier sync (`updated_at > ?`)
+2. **Apply** : Les changements reçus sont appliqués dans IndexedDB (y compris les suppressions)
+3. **Push** : Les opérations locales en attente sont envoyées au serveur en lot
+4. **Resolve** : Les résultats sont traités (ID mapping, conflits → server wins)
+5. **Cleanup** : La file d'attente est vidée pour les opérations réussies
+
+### Résolution des Conflits
+
+- **Stratégie** : Last-Write-Wins (LWW) avec priorité serveur
+- Si `server.updated_at > client.clientTimestamp`, le serveur gagne
+- Le client reçoit `status: 'conflict'` avec les données serveur et les applique localement
+
+### IndexedDB — Schéma Local
+
+| Store | keyPath | Indexes |
+|-------|---------|---------|
+| `expenses` | id | cycleKey, date, categoryId |
+| `categories` | id | sortOrder |
+| `recurring` | id | — |
+| `budget` | userId | — |
+| `syncQueue` | id (auto) | entity, createdAt |
+| `metadata` | key | — |
+
+### Service Worker
+
+Le SW (`sw.js`) gère :
+- **Pré-cache** : App shell (`/`, manifest)
+- **Stale-while-revalidate** : Assets JS/CSS (Vite bundles)
+- **Cache-first** : Google Fonts, images uploadées
+- **Network-first + fallback** : Navigation (sert le shell offline)
+- **Skip** : Appels API (gérés par IndexedDB côté app)
 
 ---
 
@@ -356,6 +475,7 @@ cd server && npx web-push generate-vapid-keys
 - ✅ PWA installable
 - ✅ Dark mode
 - ✅ Docker ready
+- ✅ **Mode Offline-First** (IndexedDB + sync bidirectionnelle)
 
 ### V1.1 (Futur)
 - [ ] Multi-utilisateurs complet

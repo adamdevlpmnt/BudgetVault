@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, Trash2, Search, X, Image } from 'lucide-react';
-import { api } from '../utils/api';
+import { offlineApi as api } from '../utils/offlineApi.js';
 import { formatMoney, formatDate } from '../utils/format';
 import toast from 'react-hot-toast';
 import ExpenseModal from '../components/ExpenseModal';

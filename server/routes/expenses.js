@@ -32,7 +32,7 @@ router.get('/', (req, res) => {
   try {
     const { cycle, startDate, endDate, categoryId, limit = 50, offset = 0 } = req.query;
 
-    let query = 'SELECT e.*, c.name as category_name, c.color as category_color, c.icon as category_icon FROM expenses e LEFT JOIN categories c ON e.category_id = c.id WHERE e.user_id = ?';
+    let query = 'SELECT e.*, c.name as category_name, c.color as category_color, c.icon as category_icon FROM expenses e LEFT JOIN categories c ON e.category_id = c.id WHERE e.user_id = ? AND e.deleted_at IS NULL';
     const params = [req.userId];
 
     if (cycle) {
@@ -93,29 +93,35 @@ router.post('/', (req, res) => {
     const user = db.prepare('SELECT cycle_start_day FROM users WHERE id = ?').get(req.userId);
     const cycleKey = getCycleKey(date, user.cycle_start_day);
 
-    const result = db.prepare(
-      `INSERT INTO expenses (user_id, category_id, amount, description, note, date, receipt_image, cycle_key, type)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(
-      req.userId,
-      categoryId || null,
-      numAmount,
-      description || '',
-      note || '',
-      date,
-      receiptImage || null,
-      cycleKey,
-      entryType
-    );
+    const createExpenseTransaction = db.transaction(() => {
+      const result = db.prepare(
+        `INSERT INTO expenses (user_id, category_id, amount, description, note, date, receipt_image, cycle_key, type, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+      ).run(
+        req.userId,
+        categoryId || null,
+        numAmount,
+        description || '',
+        note || '',
+        date,
+        receiptImage || null,
+        cycleKey,
+        entryType
+      );
 
-    // Income adds to balance, expense deducts
-    if (entryType === 'income') {
-      db.prepare('UPDATE budget SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?')
-        .run(numAmount, req.userId);
-    } else {
-      db.prepare('UPDATE budget SET balance = balance - ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?')
-        .run(numAmount, req.userId);
-    }
+      // Income adds to balance, expense deducts
+      if (entryType === 'income') {
+        db.prepare('UPDATE budget SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?')
+          .run(numAmount, req.userId);
+      } else {
+        db.prepare('UPDATE budget SET balance = balance - ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?')
+          .run(numAmount, req.userId);
+      }
+
+      return result;
+    });
+
+    const result = createExpenseTransaction();
 
     const expense = db.prepare(
       'SELECT e.*, c.name as category_name, c.color as category_color, c.icon as category_icon FROM expenses e LEFT JOIN categories c ON e.category_id = c.id WHERE e.id = ?'
@@ -153,33 +159,38 @@ router.put('/:id', (req, res) => {
     const newDate = date || existing.date;
     const cycleKey = getCycleKey(newDate, user.cycle_start_day);
 
-    db.prepare(
-      `UPDATE expenses SET
-        amount = ?, description = ?, note = ?, date = ?,
-        category_id = ?, receipt_image = ?, cycle_key = ?
-       WHERE id = ? AND user_id = ?`
-    ).run(
-      newAmount,
-      description !== undefined ? description : existing.description,
-      note !== undefined ? note : existing.note,
-      newDate,
-      categoryId !== undefined ? categoryId : existing.category_id,
-      receiptImage !== undefined ? receiptImage : existing.receipt_image,
-      cycleKey,
-      id,
-      req.userId
-    );
+    const updateExpenseTransaction = db.transaction(() => {
+      db.prepare(
+        `UPDATE expenses SET
+          amount = ?, description = ?, note = ?, date = ?,
+          category_id = ?, receipt_image = ?, cycle_key = ?,
+          updated_at = datetime('now')
+         WHERE id = ? AND user_id = ?`
+      ).run(
+        newAmount,
+        description !== undefined ? description : existing.description,
+        note !== undefined ? note : existing.note,
+        newDate,
+        categoryId !== undefined ? categoryId : existing.category_id,
+        receiptImage !== undefined ? receiptImage : existing.receipt_image,
+        cycleKey,
+        id,
+        req.userId
+      );
 
-    // Adjust balance if amount changed — income adds, expense deducts
-    if (amountDiff !== 0) {
-      if (entryType === 'income') {
-        db.prepare('UPDATE budget SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?')
-          .run(amountDiff, req.userId);
-      } else {
-        db.prepare('UPDATE budget SET balance = balance - ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?')
-          .run(amountDiff, req.userId);
+      // Adjust balance if amount changed — income adds, expense deducts
+      if (amountDiff !== 0) {
+        if (entryType === 'income') {
+          db.prepare('UPDATE budget SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?')
+            .run(amountDiff, req.userId);
+        } else {
+          db.prepare('UPDATE budget SET balance = balance - ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?')
+            .run(amountDiff, req.userId);
+        }
       }
-    }
+    });
+
+    updateExpenseTransaction();
 
     const expense = db.prepare(
       'SELECT e.*, c.name as category_name, c.color as category_color, c.icon as category_icon FROM expenses e LEFT JOIN categories c ON e.category_id = c.id WHERE e.id = ?'
@@ -202,22 +213,29 @@ router.delete('/:id', (req, res) => {
   try {
     const { id } = req.params;
 
-    const existing = db.prepare('SELECT * FROM expenses WHERE id = ? AND user_id = ?').get(id, req.userId);
+    const existing = db.prepare('SELECT * FROM expenses WHERE id = ? AND user_id = ? AND deleted_at IS NULL').get(id, req.userId);
     if (!existing) {
       return res.status(404).json({ error: 'Entrée non trouvée' });
     }
 
-    db.prepare('DELETE FROM expenses WHERE id = ? AND user_id = ?').run(id, req.userId);
+    const deleteExpenseTransaction = db.transaction(() => {
+      // Soft delete
+      db.prepare(
+        "UPDATE expenses SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ? AND user_id = ?"
+      ).run(id, req.userId);
 
-    // Restore balance — reverse the original operation
-    const entryType = existing.type || 'expense';
-    if (entryType === 'income') {
-      db.prepare('UPDATE budget SET balance = balance - ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?')
-        .run(existing.amount, req.userId);
-    } else {
-      db.prepare('UPDATE budget SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?')
-        .run(existing.amount, req.userId);
-    }
+      // Restore balance — reverse the original operation
+      const entryType = existing.type || 'expense';
+      if (entryType === 'income') {
+        db.prepare('UPDATE budget SET balance = balance - ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?')
+          .run(existing.amount, req.userId);
+      } else {
+        db.prepare('UPDATE budget SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?')
+          .run(existing.amount, req.userId);
+      }
+    });
+
+    deleteExpenseTransaction();
 
     const budget = db.prepare('SELECT balance FROM budget WHERE user_id = ?').get(req.userId);
 

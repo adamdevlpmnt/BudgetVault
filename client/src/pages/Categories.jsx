@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit3, Trash2, X } from 'lucide-react';
-import { api } from '../utils/api';
+import { offlineApi as api } from '../utils/offlineApi.js';
 import toast from 'react-hot-toast';
 
 const COLORS = ['#ef4444','#f97316','#f59e0b','#84cc16','#10b981','#06b6d4','#3b82f6','#6366f1','#8b5cf6','#ec4899','#64748b','#78716c'];

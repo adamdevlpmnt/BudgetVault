@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { api } from '../utils/api';
 import { setCurrency } from '../utils/format';
+import { clearAll } from '../utils/offlineDb.js';
+import { stopAutoSync, startAutoSync } from '../utils/syncEngine.js';
 
 const AuthContext = createContext(null);
 
@@ -23,10 +25,17 @@ export function AuthProvider({ children }) {
         setUser(u);
         setCurrency(u.currency || 'EUR');
         localStorage.setItem('budgetvault_user', JSON.stringify(u));
-      }).catch(() => {
-        localStorage.removeItem('budgetvault_token');
-        localStorage.removeItem('budgetvault_user');
-        setUser(null);
+      }).catch((err) => {
+        // Offline tolerance: if we have stored user data, keep the session alive
+        const storedUser = localStorage.getItem('budgetvault_user');
+        if (storedUser && !navigator.onLine) {
+          console.warn('[Auth] Offline — using cached user data');
+          // Keep existing user state, don't clear
+        } else {
+          localStorage.removeItem('budgetvault_token');
+          localStorage.removeItem('budgetvault_user');
+          setUser(null);
+        }
       }).finally(() => setLoading(false));
     } else {
       setLoading(false);
@@ -39,13 +48,22 @@ export function AuthProvider({ children }) {
     localStorage.setItem('budgetvault_user', JSON.stringify(data.user));
     setCurrency(data.user.currency || 'EUR');
     setUser(data.user);
+    // Start auto-sync after login
+    startAutoSync();
     return data;
   };
 
-  const logout = () => {
+  const logout = async () => {
     localStorage.removeItem('budgetvault_token');
     localStorage.removeItem('budgetvault_user');
     setUser(null);
+    // Stop sync and clear offline data
+    stopAutoSync();
+    try {
+      await clearAll();
+    } catch (e) {
+      console.warn('[Auth] Failed to clear offline data:', e);
+    }
   };
 
   const updateUser = (updates) => {
@@ -67,3 +85,4 @@ export function useAuth() {
   if (!ctx) throw new Error('useAuth must be inside AuthProvider');
   return ctx;
 }
+

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement } from 'chart.js';
 import { Doughnut, Bar } from 'react-chartjs-2';
 import { PieChart, BarChart3, Calendar } from 'lucide-react';
-import { api } from '../utils/api';
+import { offlineApi as api } from '../utils/offlineApi.js';
 import { useAuth } from '../context/AuthContext';
 import { formatMoney, formatDate, formatDateFull, cycleName, getCurrency, CURRENCIES } from '../utils/format';
 import toast from 'react-hot-toast';

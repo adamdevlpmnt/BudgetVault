@@ -26,17 +26,17 @@ router.get('/summary', (req, res) => {
     const { startDate, endDate } = getCycleDates(user.cycle_start_day, cycleKey);
 
     const expenses = db.prepare(
-      'SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE user_id = ? AND date >= ? AND date <= ?'
+      'SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE user_id = ? AND date >= ? AND date <= ? AND deleted_at IS NULL'
     ).get(req.userId, startDate, endDate);
 
     const budget = db.prepare('SELECT balance FROM budget WHERE user_id = ?').get(req.userId);
     const expenseCount = db.prepare(
-      'SELECT COUNT(*) as count FROM expenses WHERE user_id = ? AND date >= ? AND date <= ?'
+      'SELECT COUNT(*) as count FROM expenses WHERE user_id = ? AND date >= ? AND date <= ? AND deleted_at IS NULL'
     ).get(req.userId, startDate, endDate);
 
     const todayStr = new Date().toISOString().split('T')[0];
     const todayExpenses = db.prepare(
-      'SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE user_id = ? AND date = ?'
+      'SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE user_id = ? AND date = ? AND deleted_at IS NULL'
     ).get(req.userId, todayStr);
 
     res.json({
@@ -63,7 +63,7 @@ router.get('/by-category', (req, res) => {
     const data = db.prepare(
       `SELECT c.id, c.name, c.color, c.icon, COALESCE(SUM(e.amount), 0) as total, COUNT(e.id) as count
        FROM expenses e LEFT JOIN categories c ON e.category_id = c.id
-       WHERE e.user_id = ? AND e.date >= ? AND e.date <= ?
+       WHERE e.user_id = ? AND e.date >= ? AND e.date <= ? AND e.deleted_at IS NULL
        GROUP BY COALESCE(c.id, 0) ORDER BY total DESC`
     ).all(req.userId, startDate, endDate);
 
@@ -94,7 +94,7 @@ router.get('/history', (req, res) => {
       const { startDate, endDate } = getCycleDates(user.cycle_start_day, key);
 
       const expenses = db.prepare(
-        'SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE user_id = ? AND date >= ? AND date <= ?'
+        'SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE user_id = ? AND date >= ? AND date <= ? AND deleted_at IS NULL'
       ).get(req.userId, startDate, endDate);
 
       if (expenses.total > 0 || i < 3) {
@@ -125,7 +125,7 @@ router.get('/daily', (req, res) => {
 
     const data = db.prepare(
       `SELECT date, SUM(amount) as total, COUNT(*) as count
-       FROM expenses WHERE user_id = ? AND date >= ? AND date <= ?
+       FROM expenses WHERE user_id = ? AND date >= ? AND date <= ? AND deleted_at IS NULL
        GROUP BY date ORDER BY date ASC`
     ).all(req.userId, startDate, endDate);
 

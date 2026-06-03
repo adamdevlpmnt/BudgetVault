@@ -24,6 +24,8 @@ async function request(endpoint, options = {}) {
 }
 
 export const api = {
+  // Internal request helper (used by sync engine)
+  request,
   // Auth
   login: (username, password) => request('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
   changePassword: (currentPassword, newPassword) => request('/auth/change-password', { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }) }),
