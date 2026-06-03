@@ -338,6 +338,10 @@ export function startAutoSync() {
   window.addEventListener('online', handleOnline);
   window.addEventListener('offline', handleOffline);
 
+  // iOS PWA: when app returns from background, JS is unfrozen but
+  // setInterval may have been skipped. Trigger sync on visibility change.
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+
   console.log('[Sync] Auto-sync started');
 }
 
@@ -355,6 +359,7 @@ export function stopAutoSync() {
   }
   window.removeEventListener('online', handleOnline);
   window.removeEventListener('offline', handleOffline);
+  document.removeEventListener('visibilitychange', handleVisibilityChange);
   console.log('[Sync] Auto-sync stopped');
 }
 
@@ -368,6 +373,13 @@ function handleOnline() {
 function handleOffline() {
   console.log('[Sync] Gone offline');
   syncEvents.emit('offline');
+}
+
+function handleVisibilityChange() {
+  if (document.visibilityState === 'visible' && isOnline() && !_isSyncing) {
+    console.log('[Sync] App resumed — triggering sync');
+    setTimeout(() => sync(), 500);
+  }
 }
 
 /**
