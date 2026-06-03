@@ -155,8 +155,8 @@ function initDatabase() {
   try {
     db.prepare('SELECT updated_at FROM expenses LIMIT 1').get();
   } catch {
-    db.exec("ALTER TABLE expenses ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP");
-    db.exec("UPDATE expenses SET updated_at = created_at WHERE updated_at IS NULL");
+    db.exec("ALTER TABLE expenses ADD COLUMN updated_at DATETIME");
+    db.exec("UPDATE expenses SET updated_at = COALESCE(created_at, datetime('now')) WHERE updated_at IS NULL");
     console.log('✅ Migration: added updated_at column to expenses');
   }
 
@@ -172,8 +172,8 @@ function initDatabase() {
   try {
     db.prepare('SELECT updated_at FROM categories LIMIT 1').get();
   } catch {
-    db.exec("ALTER TABLE categories ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP");
-    db.exec("UPDATE categories SET updated_at = created_at WHERE updated_at IS NULL");
+    db.exec("ALTER TABLE categories ADD COLUMN updated_at DATETIME");
+    db.exec("UPDATE categories SET updated_at = COALESCE(created_at, datetime('now')) WHERE updated_at IS NULL");
     console.log('✅ Migration: added updated_at column to categories');
   }
 
@@ -189,8 +189,8 @@ function initDatabase() {
   try {
     db.prepare('SELECT updated_at FROM recurring LIMIT 1').get();
   } catch {
-    db.exec("ALTER TABLE recurring ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP");
-    db.exec("UPDATE recurring SET updated_at = created_at WHERE updated_at IS NULL");
+    db.exec("ALTER TABLE recurring ADD COLUMN updated_at DATETIME");
+    db.exec("UPDATE recurring SET updated_at = COALESCE(created_at, datetime('now')) WHERE updated_at IS NULL");
     console.log('✅ Migration: added updated_at column to recurring');
   }
 
