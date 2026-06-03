@@ -28,6 +28,7 @@ export default function Login() {
         <div className="login-logo">
           <Wallet size={48} style={{ color: '#818cf8', marginBottom: 12 }} />
           <h1>BudgetVault</h1>
+          <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', opacity: 0.5, marginTop: 2, marginBottom: 8, letterSpacing: '0.1em' }}>v2.0.1</p>
           <p>Gérez votre budget en toute simplicité</p>
         </div>
 

@@ -1,10 +1,11 @@
 # 🏦 BudgetVault
 
-Application web moderne de gestion de budget familial et personnel.
+Application web moderne de gestion de budget familial et personnel — **fonctionne même sans Internet**.
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Version](https://img.shields.io/badge/version-2.0.1-blue)
 ![Docker](https://img.shields.io/badge/docker-ready-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
+![Offline](https://img.shields.io/badge/offline-first-orange)
 
 ---
 
@@ -13,6 +14,7 @@ Application web moderne de gestion de budget familial et personnel.
 - 💰 **Gestion du solde** — Suivi en temps réel, masquer/afficher, édition rapide
 - 📊 **Graphiques** — Camembert par catégorie, historique mensuel en barres
 - 📱 **Mobile-first** — Optimisé smartphone, installable en PWA
+- 📡 **Offline-First** — Fonctionne sans connexion, synchronisation automatique au retour en ligne
 - 🔄 **Récurrents** — Revenus et dépenses automatiques (salaire, loyer...)
 - 🏷️ **Catégories** — 10 par défaut, personnalisables avec couleurs et icônes
 - 📸 **Tickets de caisse** — Upload et compression automatique des photos
@@ -20,6 +22,26 @@ Application web moderne de gestion de budget familial et personnel.
 - 📅 **Cycles budgétaires** — Début configurable (ex : du 15 au 14)
 - 🔒 **Sécurisé** — Auth JWT, bcrypt, rate limiting anti brute-force
 - 🐳 **Docker** — Déploiement en une commande
+
+---
+
+## 📡 Mode Offline-First (v2.0.1)
+
+BudgetVault fonctionne désormais **sans connexion Internet**. Toutes les données sont stockées localement dans le navigateur (IndexedDB) et synchronisées automatiquement avec le serveur.
+
+### Ce qui fonctionne hors ligne
+- ✅ Consulter/ajouter/modifier/supprimer des dépenses
+- ✅ Gérer les catégories et les récurrents
+- ✅ Modifier le solde
+- ✅ Consulter les statistiques et graphiques
+- ✅ Naviguer entre toutes les pages
+
+### Synchronisation
+- 🔄 **Auto-sync** toutes les 30 secondes quand en ligne
+- ⚡ **Sync instantanée** à la reconnexion
+- 🔁 **Retry automatique** en cas d'échec (backoff exponentiel)
+- 🛡️ **Résolution de conflits** — Priorité serveur (Last-Write-Wins)
+- 📊 **Indicateur visuel** — Barre de statut et pastille colorée dans la navbar
 
 ---
 
@@ -176,6 +198,8 @@ docker compose up -d
 docker compose logs -f
 ```
 
+> 💡 Les migrations de base de données s'exécutent automatiquement au démarrage. Aucune intervention manuelle requise.
+
 ---
 
 ## 💾 Backup & Restauration
@@ -220,11 +244,11 @@ Ce repo utilise **GitHub Actions** pour construire et publier automatiquement l'
 Pour publier une version taguée :
 
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+git tag v2.0.1
+git push origin v2.0.1
 ```
 
-L'image sera disponible sous `ghcr.io/adamdevlpmnt/budgetvault:1.0.0`.
+L'image sera disponible sous `ghcr.io/adamdevlpmnt/budgetvault:2.0.1`.
 
 ### Rendre l'image publique
 
@@ -244,6 +268,7 @@ Par défaut, les images GHCR sont privées. Pour la rendre publique :
 | Frontend | React 18 + Vite 5 |
 | Backend | Express.js (Node.js 20) |
 | Database | SQLite (better-sqlite3) |
+| Offline | IndexedDB (idb v8) + Sync Engine |
 | Charts | Chart.js 4 |
 | Auth | JWT + bcrypt |
 | Push | web-push + Service Workers |
@@ -257,7 +282,20 @@ Par défaut, les images GHCR sont privées. Pour la rendre publique :
 Vault/
 ├── .github/workflows/     # CI/CD GitHub Actions
 ├── client/                # Frontend React
+│   └── src/
+│       ├── utils/
+│       │   ├── api.js           # Client HTTP direct
+│       │   ├── offlineApi.js    # Wrapper offline-first
+│       │   ├── offlineDb.js     # Couche IndexedDB
+│       │   └── syncEngine.js    # Moteur de synchronisation
+│       ├── context/
+│       │   ├── AuthContext.jsx   # Authentification
+│       │   └── SyncContext.jsx   # État de sync global
+│       └── components/
+│           └── SyncStatusBar.jsx # Indicateur visuel
 ├── server/                # Backend Express
+│   └── routes/
+│       └── sync.js              # Endpoint synchronisation
 ├── data/                  # Base SQLite + uploads (volume Docker)
 ├── docker-compose.yml     # Installation (pull depuis GHCR)
 ├── docker-compose.build.yml # Build local
@@ -272,8 +310,9 @@ Vault/
 
 Voir [CLAUDE.md](CLAUDE.md) pour la documentation technique complète :
 - Architecture détaillée
+- Architecture Offline-First & synchronisation
 - Modèle de données SQL
-- Endpoints API
+- Endpoints API (y compris `/api/sync`)
 - Design system
 - Stratégie de sécurité
 - Roadmap
@@ -289,10 +328,37 @@ BudgetVault est une **PWA** (Progressive Web App). Pour l'ajouter à l'écran d'
 2. Appuyez sur le bouton **Partager** (carré avec flèche)
 3. Sélectionnez **Sur l'écran d'accueil**
 
+> 💡 En mode PWA sur iPhone, l'application fonctionne même sans connexion grâce au mode offline-first.
+
 ### Android (Chrome)
 1. Ouvrez `http://votre-ip:3001` dans Chrome
 2. Appuyez sur les **3 points** en haut à droite
 3. Sélectionnez **Ajouter à l'écran d'accueil**
+
+---
+
+## 📝 Changelog
+
+### v2.0.1 — Mode Offline-First
+- 📡 **Offline-First** — L'application fonctionne entièrement sans connexion Internet
+- 🗄️ **IndexedDB** — Stockage local des données dans le navigateur
+- 🔄 **Synchronisation bidirectionnelle** — Pull/push automatique avec le serveur
+- ⚡ **Auto-sync** — Toutes les 30s + immédiat à la reconnexion
+- 🛡️ **Résolution de conflits** — Last-Write-Wins avec priorité serveur
+- 📊 **Indicateur visuel** — Barre de statut et pastille de sync dans la navbar
+- 🔒 **Soft-delete** — Les suppressions sont réversibles côté serveur
+- ⚙️ **Transactions atomiques** — Insert + balance wrappés dans des transactions SQLite
+- 🔧 **Service Worker réécrit** — Pré-cache, stale-while-revalidate, offline shell
+
+### v1.0.0 — Version initiale
+- 💰 Gestion du solde et des dépenses
+- 🏷️ Catégories personnalisables
+- 🔄 Revenus/dépenses récurrents
+- 📊 Graphiques et statistiques
+- 📸 Upload tickets de caisse
+- 🔔 Notifications push
+- 📅 Cycles budgétaires configurables
+- 🐳 Docker ready
 
 ---
 
@@ -316,3 +382,8 @@ Changez le port dans `docker-compose.yml` :
     ports:
       - "8080:3001"  # Utiliser le port 8080
 ```
+
+### Les données hors-ligne ne se synchronisent pas
+1. Vérifiez la barre de statut en haut de l'écran
+2. Appuyez sur le bouton **↻** pour forcer une synchronisation
+3. Vérifiez les logs du serveur : `docker compose logs -f`
