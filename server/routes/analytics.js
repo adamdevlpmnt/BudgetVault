@@ -84,15 +84,13 @@ router.get('/history', (req, res) => {
   try {
     const user = db.prepare('SELECT cycle_start_day FROM users WHERE id = ?').get(req.userId);
     const limit = parseInt(req.query.limit) || 12;
-    const today = new Date();
     const history = [];
 
+    // Start from the ACTUAL current cycle, not the calendar month
+    let [year, month] = getCurrentCycleKey(user.cycle_start_day).split('-').map(Number);
+
     for (let i = 0; i < limit; i++) {
-      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-      const key = getCycleKey(
-        new Date(d.getFullYear(), d.getMonth(), user.cycle_start_day).toISOString().split('T')[0],
-        user.cycle_start_day
-      );
+      const key = `${year}-${String(month).padStart(2, '0')}`;
       const { startDate, endDate } = getCycleDates(user.cycle_start_day, key);
 
       const expenses = db.prepare(
@@ -101,6 +99,13 @@ router.get('/history', (req, res) => {
 
       if (expenses.total > 0 || i < 3) {
         history.push({ cycleKey: key, startDate, endDate, totalExpenses: expenses.total });
+      }
+
+      // Go to the previous cycle
+      month -= 1;
+      if (month < 1) {
+        month = 12;
+        year -= 1;
       }
     }
 
