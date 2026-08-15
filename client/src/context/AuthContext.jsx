@@ -26,12 +26,15 @@ export function AuthProvider({ children }) {
         setCurrency(u.currency || 'EUR');
         localStorage.setItem('budgetvault_user', JSON.stringify(u));
       }).catch((err) => {
-        // Offline tolerance: if we have stored user data, keep the session alive
+        // Offline resilience: only logout if strictly unauthorized (401)
+        const isAuthError = err?.status === 401 || err?.message?.toLowerCase().includes('authentifi') || err?.message?.toLowerCase().includes('token');
         const storedUser = localStorage.getItem('budgetvault_user');
-        if (storedUser && !navigator.onLine) {
-          console.warn('[Auth] Offline — using cached user data');
+
+        if (!isAuthError && storedUser) {
+          console.warn('[Auth] Network error or offline — keeping cached session active:', err.message);
           // Keep existing user state, don't clear
-        } else {
+        } else if (isAuthError) {
+          console.warn('[Auth] Token expired or invalid — logging out');
           localStorage.removeItem('budgetvault_token');
           localStorage.removeItem('budgetvault_user');
           setUser(null);

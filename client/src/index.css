@@ -129,7 +129,12 @@
   background: #cbd5e1;
 }
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
 
 html {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -138,12 +143,14 @@ html {
   -moz-osx-font-smoothing: grayscale;
   color: var(--text);
   background: var(--bg);
+  touch-action: manipulation;
 }
 
 body {
   min-height: 100dvh;
   background: var(--bg);
   overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 #root {
@@ -1230,4 +1237,260 @@ textarea.input { min-height: 80px; resize: vertical; }
   font-weight: 600;
   margin-left: 8px;
 }
+
+/* ═══════════════════════════════════════
+   Pull-To-Refresh Mobile Component
+   ═══════════════════════════════════════ */
+.pull-to-refresh-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  pointer-events: none;
+  z-index: 1400;
+  transition: transform 0.15s cubic-bezier(0.2, 0.9, 0.3, 1), opacity 0.15s ease;
+}
+
+.pull-to-refresh-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 24px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
+}
+
+.pull-to-refresh-badge.ready {
+  color: var(--primary-light);
+  border-color: var(--primary);
+  background: var(--bg-elevated);
+}
+
+.pull-to-refresh-badge.refreshing {
+  color: var(--primary-light);
+  border-color: var(--primary);
+}
+
+.pull-spinner {
+  animation: syncSpin 0.8s linear infinite;
+}
+
+.pull-text {
+  letter-spacing: 0.01em;
+}
+
+/* ═══════════════════════════════════════
+   Search & Filter Bar in Expenses
+   ═══════════════════════════════════════ */
+.search-bar-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.search-icon {
+  position: absolute;
+  left: 14px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.search-input {
+  width: 100%;
+  padding: 10px 38px 10px 42px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text);
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.search-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-glow);
+}
+
+.search-clear-btn {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 50%;
+  transition: color 0.15s ease;
+}
+
+.search-clear-btn:hover {
+  color: var(--text);
+}
+
+/* ═══ Type Toggle Tabs (All / Expenses / Income) ═══ */
+.type-toggle-tabs {
+  display: flex;
+  background: var(--bg-input);
+  padding: 4px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  gap: 4px;
+}
+
+.type-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 9px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  touch-action: manipulation;
+}
+
+.type-tab.active {
+  background: var(--bg-card);
+  color: var(--text);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.type-tab.active.expense-tab {
+  color: var(--danger-light);
+}
+
+.type-tab.active.income-tab {
+  color: var(--success-light);
+}
+
+/* ═══ Filtered Summary Banner ═══ */
+.filtered-summary-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 10px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: 0.82rem;
+}
+
+.filtered-stat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filtered-stat .label {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.filtered-stat .val {
+  font-weight: 700;
+}
+
+.filtered-stat .expense-val {
+  color: var(--danger-light);
+}
+
+.filtered-stat .income-val {
+  color: var(--success-light);
+}
+
+/* ═══════════════════════════════════════
+   Modal Preset Chips & Touch Improvements
+   ═══════════════════════════════════════ */
+.amount-presets-row, .date-presets-row {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 2px 0 6px 0;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.amount-presets-row::-webkit-scrollbar, .date-presets-row::-webkit-scrollbar {
+  display: none;
+}
+
+.amount-preset-chip {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  touch-action: manipulation;
+}
+
+.amount-preset-chip:active, .date-preset-chip:active {
+  transform: scale(0.94);
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+.date-preset-chip {
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  touch-action: manipulation;
+}
+
+.date-preset-chip.active {
+  background: var(--primary-glow);
+  border-color: var(--primary);
+  color: var(--primary-light);
+  font-weight: 700;
+}
+
+/* ═══ Active press micro-interactions ═══ */
+.btn:active, .fab:active, .nav-item:active, .filter-chip:active, .active-item:active {
+  transform: scale(0.97);
+  transition: transform 0.08s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.category-chip:active {
+  transform: scale(0.95);
+}
+
+.balance-card:active {
+  transform: scale(0.99);
+  transition: transform 0.1s ease;
+}
+
 

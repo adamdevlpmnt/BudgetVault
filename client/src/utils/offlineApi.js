@@ -1,10 +1,11 @@
 import { api } from './api.js';
 import {
-  getAllExpenses, putExpense, markExpenseDeleted, getExpense,
-  getAllCategories, putCategory, markCategoryDeleted,
+  getAllExpenses, putExpense, markExpenseDeleted, getExpense, removeExpense,
+  getAllCategories, putCategory, markCategoryDeleted, getCategory,
   getAllRecurring, putRecurring, markRecurringDeleted,
   getBudget as getLocalBudget, putBudget,
-  addToSyncQueue, getPendingCount,
+  addToSyncQueue, getPendingCount, bulkPutExpenses, bulkPutCategories, bulkPutRecurring,
+  getDb
 } from './offlineDb.js';
 import { sync, syncEvents, isOnline } from './syncEngine.js';
 
@@ -18,10 +19,23 @@ function generateTempId() {
 }
 
 /**
+ * Helper to calculate start & end date for a cycle
+ */
+function getCycleDates(startDay, cycleKey) {
+  const [year, month] = cycleKey.split('-').map(Number);
+  const startDate = new Date(year, month - 1, startDay);
+  const endDate = new Date(year, month, startDay - 1);
+  return {
+    startDate: startDate.toISOString().split('T')[0],
+    endDate: endDate.toISOString().split('T')[0],
+  };
+}
+
+/**
  * Helper to get the cycle key for a date
  */
 function getCycleKey(dateStr, startDay = 1) {
-  const d = new Date(dateStr);
+  const d = new Date(dateStr + (dateStr.length === 10 ? 'T00:00:00' : ''));
   let year = d.getFullYear();
   let month = d.getMonth() + 1;
   if (d.getDate() < startDay) {
@@ -29,6 +43,14 @@ function getCycleKey(dateStr, startDay = 1) {
     if (month < 1) { month = 12; year -= 1; }
   }
   return `${year}-${String(month).padStart(2, '0')}`;
+}
+
+/**
+ * Get current cycle key
+ */
+function getCurrentCycleKey(startDay) {
+  const today = new Date().toISOString().split('T')[0];
+  return getCycleKey(today, startDay);
 }
 
 /**
@@ -41,6 +63,17 @@ function getUserCycleStartDay() {
   } catch {
     return 1;
   }
+}
+
+// Background sync debounce trigger
+let _bgSyncTimeout = null;
+function triggerBackgroundSync() {
+  if (!isOnline()) return;
+  if (_bgSyncTimeout) return;
+  _bgSyncTimeout = setTimeout(() => {
+    _bgSyncTimeout = null;
+    sync().catch(() => {});
+  }, 1000);
 }
 
 // ==================== OFFLINE API ====================
@@ -56,18 +89,21 @@ export const offlineApi = {
   // ========== BUDGET ==========
 
   async getBudget() {
-    try {
-      if (isOnline()) {
+    const local = await getLocalBudget();
+    if (local && local.balance !== undefined) {
+      triggerBackgroundSync();
+      return local;
+    }
+
+    if (isOnline()) {
+      try {
         const result = await api.getBudget();
-        // Cache locally
         await putBudget({ ...result, user_id: result.user_id || 1 });
         return result;
+      } catch (err) {
+        console.warn('[OfflineApi] getBudget network fallback:', err.message);
       }
-    } catch (err) {
-      console.warn('[OfflineApi] getBudget network error, using cache:', err.message);
     }
-    // Fallback to IndexedDB
-    const local = await getLocalBudget();
     return local || { balance: 0 };
   },
 
@@ -100,21 +136,26 @@ export const offlineApi = {
   // ========== EXPENSES ==========
 
   async getExpenses(params = {}) {
-    try {
-      if (isOnline()) {
+    const localData = await getAllExpenses(params);
+    if (localData && localData.expenses && localData.expenses.length > 0) {
+      triggerBackgroundSync();
+      return localData;
+    }
+
+    // If local is empty and online, fetch from server to seed local DB
+    if (isOnline()) {
+      try {
         const result = await api.getExpenses(params);
-        // Cache each expense in IndexedDB
         if (result.expenses && result.expenses.length > 0) {
-          const { bulkPutExpenses } = await import('./offlineDb.js');
           await bulkPutExpenses(result.expenses);
         }
         return result;
+      } catch (err) {
+        console.warn('[OfflineApi] getExpenses network error, using cache:', err.message);
       }
-    } catch (err) {
-      console.warn('[OfflineApi] getExpenses network error, using cache:', err.message);
     }
-    // Fallback to IndexedDB
-    return getAllExpenses(params);
+
+    return localData || { expenses: [], total: 0, limit: 50, offset: 0 };
   },
 
   async createExpense(data) {
@@ -126,7 +167,7 @@ export const offlineApi = {
     const localExpense = {
       id: tempId,
       user_id: 1,
-      category_id: data.categoryId || null,
+      category_id: data.categoryId ? parseInt(data.categoryId) : null,
       amount: parseFloat(data.amount),
       description: data.description || '',
       note: data.note || '',
@@ -142,7 +183,6 @@ export const offlineApi = {
 
     // Enrich with category info from local cache
     if (data.categoryId) {
-      const { getCategory } = await import('./offlineDb.js');
       const cat = await getCategory(parseInt(data.categoryId));
       if (cat) {
         localExpense.category_name = cat.name;
@@ -157,17 +197,15 @@ export const offlineApi = {
     // Adjust local balance
     const localBudget = await getLocalBudget() || { userId: 1, balance: 0 };
     if (localExpense.type === 'income') {
-      localBudget.balance += localExpense.amount;
+      localBudget.balance = (localBudget.balance || 0) + localExpense.amount;
     } else {
-      localBudget.balance -= localExpense.amount;
+      localBudget.balance = (localBudget.balance || 0) - localExpense.amount;
     }
     await putBudget(localBudget);
 
     if (isOnline()) {
       try {
         const result = await api.createExpense(data);
-        // Replace temp record with server record
-        const { removeExpense } = await import('./offlineDb.js');
         await removeExpense(tempId);
         if (result.expense) {
           await putExpense(result.expense);
@@ -193,7 +231,6 @@ export const offlineApi = {
   },
 
   async updateExpense(id, data) {
-    // Get existing from IndexedDB
     const existing = await getExpense(id);
     const now = new Date().toISOString();
 
@@ -203,7 +240,7 @@ export const offlineApi = {
       description: data.description !== undefined ? data.description : existing?.description,
       note: data.note !== undefined ? data.note : existing?.note,
       date: data.date || existing?.date,
-      category_id: data.categoryId !== undefined ? data.categoryId : existing?.category_id,
+      category_id: data.categoryId !== undefined ? (data.categoryId ? parseInt(data.categoryId) : null) : existing?.category_id,
       receipt_image: data.receiptImage !== undefined ? data.receiptImage : existing?.receipt_image,
       updated_at: now,
       _pendingSync: true,
@@ -214,9 +251,8 @@ export const offlineApi = {
     updatedExpense.cycle_key = getCycleKey(updatedExpense.date, startDay);
 
     // Enrich with category info
-    if (data.categoryId) {
-      const { getCategory } = await import('./offlineDb.js');
-      const cat = await getCategory(parseInt(data.categoryId));
+    if (updatedExpense.category_id) {
+      const cat = await getCategory(updatedExpense.category_id);
       if (cat) {
         updatedExpense.category_name = cat.name;
         updatedExpense.category_color = cat.color;
@@ -289,10 +325,8 @@ export const offlineApi = {
 
     if (isOnline()) {
       try {
-        // Only send to server if it has a real server ID (positive)
         if (id > 0) {
           const result = await api.deleteExpense(id);
-          const { removeExpense } = await import('./offlineDb.js');
           await removeExpense(id);
           if (result.newBalance !== undefined) {
             const lb = await getLocalBudget() || { userId: 1, balance: 0 };
@@ -301,7 +335,6 @@ export const offlineApi = {
           return result;
         } else {
           // Temp record — just remove locally
-          const { removeExpense } = await import('./offlineDb.js');
           await removeExpense(id);
           const lb = await getLocalBudget();
           return { message: 'Entrée supprimée', newBalance: lb?.balance };
@@ -327,19 +360,24 @@ export const offlineApi = {
   // ========== CATEGORIES ==========
 
   async getCategories() {
-    try {
-      if (isOnline()) {
+    const local = await getAllCategories();
+    if (local && local.length > 0) {
+      triggerBackgroundSync();
+      return local;
+    }
+
+    if (isOnline()) {
+      try {
         const result = await api.getCategories();
         if (result && result.length > 0) {
-          const { bulkPutCategories } = await import('./offlineDb.js');
           await bulkPutCategories(result);
         }
         return result;
+      } catch (err) {
+        console.warn('[OfflineApi] getCategories network fallback:', err.message);
       }
-    } catch (err) {
-      console.warn('[OfflineApi] getCategories network error, using cache:', err.message);
     }
-    return getAllCategories();
+    return local || [];
   },
 
   async createCategory(data) {
@@ -367,7 +405,6 @@ export const offlineApi = {
     if (isOnline()) {
       try {
         const result = await api.createCategory(data);
-        const { getDb } = await import('./offlineDb.js');
         const db = await getDb();
         await db.delete('categories', tempId);
         await putCategory(result);
@@ -383,7 +420,6 @@ export const offlineApi = {
   },
 
   async updateCategory(id, data) {
-    const { getCategory } = await import('./offlineDb.js');
     const existing = await getCategory(id);
     const now = new Date().toISOString();
 
@@ -421,15 +457,12 @@ export const offlineApi = {
 
     if (isOnline()) {
       try {
+        const db = await getDb();
         if (id > 0) {
           const result = await api.deleteCategory(id);
-          const { getDb } = await import('./offlineDb.js');
-          const db = await getDb();
           await db.delete('categories', id);
           return result;
         } else {
-          const { getDb } = await import('./offlineDb.js');
-          const db = await getDb();
           await db.delete('categories', id);
           return { message: 'Catégorie supprimée', expensesAffected: 0 };
         }
@@ -448,19 +481,24 @@ export const offlineApi = {
   // ========== RECURRING ==========
 
   async getRecurring() {
-    try {
-      if (isOnline()) {
+    const local = await getAllRecurring();
+    if (local && local.length > 0) {
+      triggerBackgroundSync();
+      return local;
+    }
+
+    if (isOnline()) {
+      try {
         const result = await api.getRecurring();
         if (result && result.length > 0) {
-          const { bulkPutRecurring } = await import('./offlineDb.js');
           await bulkPutRecurring(result);
         }
         return result;
+      } catch (err) {
+        console.warn('[OfflineApi] getRecurring network fallback:', err.message);
       }
-    } catch (err) {
-      console.warn('[OfflineApi] getRecurring network error, using cache:', err.message);
     }
-    return getAllRecurring();
+    return local || [];
   },
 
   async createRecurring(data) {
@@ -473,8 +511,8 @@ export const offlineApi = {
       type: data.type,
       amount: parseFloat(data.amount),
       description: (data.description || '').trim(),
-      category_id: data.categoryId || null,
-      day_of_month: data.dayOfMonth,
+      category_id: data.categoryId ? parseInt(data.categoryId) : null,
+      day_of_month: parseInt(data.dayOfMonth) || 1,
       is_active: 1,
       last_applied: null,
       created_at: now,
@@ -483,9 +521,7 @@ export const offlineApi = {
       _tempId: tempId,
     };
 
-    // Enrich with category info
     if (data.categoryId) {
-      const { getCategory } = await import('./offlineDb.js');
       const cat = await getCategory(parseInt(data.categoryId));
       if (cat) {
         localItem.category_name = cat.name;
@@ -499,7 +535,6 @@ export const offlineApi = {
     if (isOnline()) {
       try {
         const result = await api.createRecurring(data);
-        const { getDb } = await import('./offlineDb.js');
         const db = await getDb();
         await db.delete('recurring', tempId);
         await putRecurring(result);
@@ -515,7 +550,6 @@ export const offlineApi = {
   },
 
   async updateRecurring(id, data) {
-    const { getDb } = await import('./offlineDb.js');
     const db = await getDb();
     const existing = await db.get('recurring', id);
     const now = new Date().toISOString();
@@ -525,8 +559,8 @@ export const offlineApi = {
       type: data.type || existing?.type,
       amount: data.amount ? parseFloat(data.amount) : existing?.amount,
       description: data.description !== undefined ? (data.description || '').trim() : existing?.description,
-      category_id: data.categoryId !== undefined ? data.categoryId : existing?.category_id,
-      day_of_month: data.dayOfMonth || existing?.day_of_month,
+      category_id: data.categoryId !== undefined ? (data.categoryId ? parseInt(data.categoryId) : null) : existing?.category_id,
+      day_of_month: data.dayOfMonth !== undefined ? parseInt(data.dayOfMonth) : existing?.day_of_month,
       is_active: data.isActive !== undefined ? (data.isActive ? 1 : 0) : existing?.is_active,
       updated_at: now,
       _pendingSync: true,
@@ -555,15 +589,12 @@ export const offlineApi = {
 
     if (isOnline()) {
       try {
+        const db = await getDb();
         if (id > 0) {
           const result = await api.deleteRecurring(id);
-          const { getDb } = await import('./offlineDb.js');
-          const db = await getDb();
           await db.delete('recurring', id);
           return result;
         } else {
-          const { getDb } = await import('./offlineDb.js');
-          const db = await getDb();
           await db.delete('recurring', id);
           return { message: 'Supprimé' };
         }
@@ -579,58 +610,36 @@ export const offlineApi = {
     return { message: 'Supprimé' };
   },
 
-  // ========== ANALYTICS ==========
-  // Computed locally from IndexedDB when offline
+  // ========== ANALYTICS (Instant local computation) ==========
 
   async getSummary(cycle) {
-    try {
-      if (isOnline()) {
-        return await api.getSummary(cycle);
-      }
-    } catch (err) {
-      console.warn('[OfflineApi] getSummary network error, computing locally:', err.message);
-    }
-    return computeLocalSummary(cycle);
+    const local = await computeLocalSummary(cycle);
+    triggerBackgroundSync();
+    return local;
   },
 
   async getByCategory(params = {}) {
-    try {
-      if (isOnline()) {
-        return await api.getByCategory(params);
-      }
-    } catch (err) {
-      console.warn('[OfflineApi] getByCategory network error, computing locally:', err.message);
-    }
-    return computeLocalByCategory(params);
+    const local = await computeLocalByCategory(params);
+    triggerBackgroundSync();
+    return local;
   },
 
-  async getHistory(limit) {
-    try {
-      if (isOnline()) {
-        return await api.getHistory(limit);
-      }
-    } catch (err) {
-      console.warn('[OfflineApi] getHistory network error, computing locally:', err.message);
-    }
-    return computeLocalHistory(limit);
+  async getHistory(limit = 12) {
+    const local = await computeLocalHistory(limit);
+    triggerBackgroundSync();
+    return local;
   },
 
   async getDaily(params = {}) {
-    try {
-      if (isOnline()) {
-        return await api.getDaily(params);
-      }
-    } catch (err) {
-      console.warn('[OfflineApi] getDaily network error, computing locally:', err.message);
-    }
-    return [];
+    const local = await computeLocalDaily(params);
+    triggerBackgroundSync();
+    return local;
   },
 
   // ========== UPLOAD (pass-through — needs network) ==========
 
   async uploadReceipt(file) {
     if (!isOnline()) {
-      // Store as base64 in memory for later upload
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => {
@@ -654,79 +663,162 @@ export const offlineApi = {
 // ==================== LOCAL ANALYTICS COMPUTATION ====================
 
 async function computeLocalSummary(cycle) {
-  const { expenses: allExpenses } = await getAllExpenses({ cycle, limit: 99999 });
+  const startDay = getUserCycleStartDay();
+  const currentCycleKey = cycle || getCurrentCycleKey(startDay);
+  const { startDate, endDate } = getCycleDates(startDay, currentCycleKey);
+
+  const { expenses: allExpenses } = await getAllExpenses({ limit: 99999 });
   const budget = await getLocalBudget();
-  const today = new Date().toISOString().split('T')[0];
+  const todayStr = new Date().toISOString().split('T')[0];
 
   let totalExpenses = 0;
-  let totalIncome = 0;
-  let todayTotal = 0;
-  let count = 0;
+  let expenseCount = 0;
+  let todayExpenses = 0;
 
   for (const exp of allExpenses) {
-    if (exp.type === 'income') {
-      totalIncome += exp.amount;
-    } else {
+    if (exp.type === 'income') continue;
+
+    // Check date within cycle range
+    if (exp.date >= startDate && exp.date <= endDate) {
       totalExpenses += exp.amount;
-      count++;
+      expenseCount++;
     }
-    if (exp.date === today) {
-      todayTotal += exp.type === 'income' ? 0 : exp.amount;
+
+    if (exp.date === todayStr) {
+      todayExpenses += exp.amount;
     }
   }
 
+  const cycleDays = Math.max(1, Math.ceil((new Date(endDate) - new Date(startDate)) / 86400000));
+  const avgDaily = expenseCount > 0 ? totalExpenses / cycleDays : 0;
+
   return {
-    totalExpenses,
-    totalIncome,
-    todayExpenses: todayTotal,
-    transactionCount: count,
+    cycleKey: currentCycleKey,
+    startDate,
+    endDate,
     balance: budget?.balance || 0,
-    avgDaily: count > 0 ? totalExpenses / 30 : 0,
+    totalExpenses,
+    expenseCount,
+    todayExpenses,
+    avgDaily,
   };
 }
 
-async function computeLocalByCategory(params) {
-  const { expenses: allExpenses } = await getAllExpenses({ ...params, limit: 99999 });
+async function computeLocalByCategory(params = {}) {
+  const startDay = getUserCycleStartDay();
+  let startDate = params.startDate;
+  let endDate = params.endDate;
+
+  if (!startDate || !endDate) {
+    const cycleKey = params.cycle || getCurrentCycleKey(startDay);
+    const dates = getCycleDates(startDay, cycleKey);
+    startDate = dates.startDate;
+    endDate = dates.endDate;
+  }
+
+  const { expenses: allExpenses } = await getAllExpenses({ startDate, endDate, limit: 99999 });
   const categories = await getAllCategories();
   const catMap = {};
 
   for (const cat of categories) {
-    catMap[cat.id] = { ...cat, total: 0, count: 0 };
+    catMap[cat.id] = {
+      id: cat.id,
+      name: cat.name,
+      color: cat.color || '#64748b',
+      icon: cat.icon || 'tag',
+      total: 0,
+      count: 0,
+    };
   }
 
+  let grandTotal = 0;
   for (const exp of allExpenses) {
     if (exp.type === 'income') continue;
     const catId = exp.category_id;
     if (catId && catMap[catId]) {
       catMap[catId].total += exp.amount;
       catMap[catId].count++;
+    } else {
+      if (!catMap[0]) {
+        catMap[0] = { id: 0, name: 'Sans catégorie', color: '#64748b', icon: 'help-circle', total: 0, count: 0 };
+      }
+      catMap[0].total += exp.amount;
+      catMap[0].count++;
     }
+    grandTotal += exp.amount;
   }
 
-  const data = Object.values(catMap)
+  const result = Object.values(catMap)
     .filter(c => c.total > 0)
-    .sort((a, b) => b.total - a.total);
+    .sort((a, b) => b.total - a.total)
+    .map(c => ({
+      ...c,
+      percentage: grandTotal > 0 ? ((c.total / grandTotal) * 100).toFixed(1) : '0.0',
+    }));
 
-  return { categories: data };
+  return {
+    categories: result,
+    total: grandTotal,
+    startDate,
+    endDate,
+  };
 }
 
 async function computeLocalHistory(limit = 12) {
+  const startDay = getUserCycleStartDay();
   const { expenses: allExpenses } = await getAllExpenses({ limit: 99999 });
-  const cycleMap = {};
+  const history = [];
+
+  let [year, month] = getCurrentCycleKey(startDay).split('-').map(Number);
+
+  for (let i = 0; i < limit; i++) {
+    const key = `${year}-${String(month).padStart(2, '0')}`;
+    const { startDate, endDate } = getCycleDates(startDay, key);
+
+    let totalExpenses = 0;
+    for (const exp of allExpenses) {
+      if (exp.type === 'income') continue;
+      if (exp.date >= startDate && exp.date <= endDate) {
+        totalExpenses += exp.amount;
+      }
+    }
+
+    if (totalExpenses > 0 || i < 3) {
+      history.push({ cycleKey: key, startDate, endDate, totalExpenses });
+    }
+
+    month -= 1;
+    if (month < 1) {
+      month = 12;
+      year -= 1;
+    }
+  }
+
+  return history;
+}
+
+async function computeLocalDaily(params = {}) {
+  const startDay = getUserCycleStartDay();
+  let startDate = params.startDate;
+  let endDate = params.endDate;
+
+  if (!startDate || !endDate) {
+    const cycleKey = params.cycle || getCurrentCycleKey(startDay);
+    const dates = getCycleDates(startDay, cycleKey);
+    startDate = dates.startDate;
+    endDate = dates.endDate;
+  }
+
+  const { expenses: allExpenses } = await getAllExpenses({ startDate, endDate, limit: 99999 });
+  const dailyMap = {};
 
   for (const exp of allExpenses) {
     if (exp.type === 'income') continue;
-    const key = exp.cycle_key;
-    if (!key) continue;
-    if (!cycleMap[key]) cycleMap[key] = 0;
-    cycleMap[key] += exp.amount;
+    if (!dailyMap[exp.date]) dailyMap[exp.date] = { date: exp.date, total: 0, count: 0 };
+    dailyMap[exp.date].total += exp.amount;
+    dailyMap[exp.date].count++;
   }
 
-  const history = Object.entries(cycleMap)
-    .sort((a, b) => b[0].localeCompare(a[0]))
-    .slice(0, limit)
-    .map(([cycleKey, total]) => ({ cycle_key: cycleKey, total }))
-    .reverse();
-
-  return { history };
+  const daily = Object.values(dailyMap).sort((a, b) => a.date.localeCompare(b.date));
+  return { daily, startDate, endDate };
 }

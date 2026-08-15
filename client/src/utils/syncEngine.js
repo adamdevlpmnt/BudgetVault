@@ -1,11 +1,12 @@
 import { api } from './api.js';
 import {
   bulkPutExpenses, bulkPutCategories, bulkPutRecurring,
+  putExpense, putCategory, putRecurring,
   putBudget, removeExpense,
   getSyncQueue, clearSyncQueueItems,
   getLastSyncTime, setLastSyncTime,
   getAllCategories, getAllExpenses, getAllRecurring,
-  getBudget as getLocalBudget,
+  getBudget as getLocalBudget, getDb,
 } from './offlineDb.js';
 
 /** Custom event emitter for sync status updates */
@@ -183,8 +184,7 @@ async function applyRemoteChanges(remoteData) {
     const deleted = categories.filter(c => c.deleted_at);
     if (active.length > 0) await bulkPutCategories(active);
     for (const cat of deleted) {
-      const db = (await import('./offlineDb.js'));
-      const dbInstance = await db.getDb();
+      const dbInstance = await getDb();
       await dbInstance.delete('categories', cat.id);
     }
   }
@@ -194,8 +194,7 @@ async function applyRemoteChanges(remoteData) {
     const deleted = recurring.filter(r => r.deleted_at);
     if (active.length > 0) await bulkPutRecurring(active);
     for (const rec of deleted) {
-      const db = (await import('./offlineDb.js'));
-      const dbInstance = await db.getDb();
+      const dbInstance = await getDb();
       await dbInstance.delete('recurring', rec.id);
     }
   }
@@ -270,7 +269,6 @@ async function remapLocalId(entity, tempId, serverId, serverData) {
   const storeName = storeMap[entity];
   if (!storeName) return;
 
-  const { getDb } = await import('./offlineDb.js');
   const db = await getDb();
   const tx = db.transaction(storeName, 'readwrite');
 
@@ -293,8 +291,6 @@ async function remapLocalId(entity, tempId, serverId, serverData) {
  * Update a local record with server data
  */
 async function updateLocalRecord(entity, data) {
-  const { putExpense, putCategory, putRecurring, putBudget } = await import('./offlineDb.js');
-
   switch (entity) {
     case 'expense':
       await putExpense(data);

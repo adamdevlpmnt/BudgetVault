@@ -9,8 +9,8 @@
  * - API calls: Network-only (handled by IndexedDB in the app layer)
  */
 
-const CACHE_STATIC = 'budgetvault-static-v2';
-const CACHE_RUNTIME = 'budgetvault-runtime-v1';
+const CACHE_STATIC = 'budgetvault-static-v3';
+const CACHE_RUNTIME = 'budgetvault-runtime-v2';
 const CACHE_IMAGES = 'budgetvault-images-v1';
 
 // Assets to pre-cache on install

@@ -2,7 +2,7 @@
 
 Application web moderne de gestion de budget familial et personnel — **fonctionne même sans Internet**.
 
-![Version](https://img.shields.io/badge/version-2.0.1-blue)
+![Version](https://img.shields.io/badge/version-2.1.0-blue)
 ![Docker](https://img.shields.io/badge/docker-ready-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Offline](https://img.shields.io/badge/offline-first-orange)
@@ -13,10 +13,12 @@ Application web moderne de gestion de budget familial et personnel — **fonctio
 
 - 💰 **Gestion du solde** — Suivi en temps réel, masquer/afficher, édition rapide
 - 📊 **Graphiques** — Camembert par catégorie, historique mensuel en barres
-- 📱 **Mobile-first** — Optimisé smartphone, installable en PWA
-- 📡 **Offline-First** — Fonctionne sans connexion, synchronisation automatique au retour en ligne
+- 📱 **Mobile-first & PWA Ultra-Fluide** — Optimisé smartphone, gestures tactiles, pull-to-refresh
+- 📡 **Offline-First Instantané** — Affichage à 0ms depuis IndexedDB, synchronisation automatique en arrière-plan
+- 🔍 **Recherche en direct** — Filtrage instantané des transactions par mot-clé et type (Dépenses / Revenus)
+- ⚡ **Saisie rapide** — Raccourcis de dates et incréments de montant (+5€, +10€, +20€, +50€)
 - 🔄 **Récurrents** — Revenus et dépenses automatiques (salaire, loyer...)
-- 🏷️ **Catégories** — 10 par défaut, personnalisables avec couleurs et icônes
+- 🏷️ **Catégories** — Personnalisables avec couleurs et icônes
 - 📸 **Tickets de caisse** — Upload et compression automatique des photos
 - 🔔 **Notifications push** — Rappel quotidien à 20h
 - 📅 **Cycles budgétaires** — Début configurable (ex : du 15 au 14)
@@ -338,6 +340,17 @@ BudgetVault est une **PWA** (Progressive Web App). Pour l'ajouter à l'écran d'
 ---
 
 ## 📝 Changelog
+
+### v2.1.0 — Performance & Expérience Mobile PWA
+- ⚡ **Instant Cache-First (0ms)** — Les pages s'affichent immédiatement depuis le cache IndexedDB sans blocage réseau
+- 🔄 **Geste Pull-To-Refresh** — Tirer l'écran vers le bas pour déclencher la synchronisation avec retour haptique
+- 🔍 **Recherche en direct** — Filtrage instantané des transactions par mot-clé, notes, catégories ou montant
+- 🏷️ **Filtres Dépenses / Revenus** — Onglets rapides pour isoler les types de transaction avec total filtré en temps réel
+- ⚡ **Saisie rapide** — Raccourcis date ("Aujourd'hui", "Hier") et boutons incréments (+5€, +10€, +20€, +50€, +100€)
+- 🚀 **Bundle Splitting & Optimisation JS** — Bundle principal allégé de 430kB à 81kB (21kB gzip) pour un démarrage instantané
+- 🏎️ **PRAGMAs SQLite Haute Vitesse** — Cache 64MB en RAM, `synchronous = NORMAL`, `temp_store = MEMORY`
+- 🛡️ **Résilience Auth Hors-Ligne** — Maintien de session même sur réseau cellulaire instable
+- 📱 **Optimisation Tactile iOS** — Suppression du délai tactile de 300ms (`touch-action: manipulation`) et micro-animations fluides
 
 ### v2.0.1 — Mode Offline-First
 - 📡 **Offline-First** — L'application fonctionne entièrement sans connexion Internet

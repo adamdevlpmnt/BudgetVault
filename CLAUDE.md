@@ -460,11 +460,16 @@ cd server && npx web-push generate-vapid-keys
 
 ---
 
-## 📈 Roadmap
+### V2.1 (Actuel)
+- ✅ **Mode Offline-First Instantané** (0ms de latence de navigation, cache-first + background sync)
+- ✅ **Geste Pull-To-Refresh** (tirer pour synchroniser avec feedback haptique)
+- ✅ **Recherche en direct & Filtres Type** (Dépenses / Revenus / Recherche textuelle instantanée)
+- ✅ **Saisie ultra-rapide** (presets de dates et montants rapides +5€, +10€, +20€, +50€, +100€)
+- ✅ **Optimisation iOS PWA** (touch-action manipulation, bundle splitting 80kB, PRAGMAs SQLite 64MB cache)
 
-### V1.0 (Actuel)
+### V1.0 - V2.0
 - ✅ Auth avec admin par défaut
-- ✅ Gestion du solde
+- ✅ Gestion du solde et comparaison mensuelle
 - ✅ Cycles budgétaires configurables
 - ✅ CRUD dépenses avec catégories
 - ✅ Upload tickets de caisse
@@ -475,58 +480,25 @@ cd server && npx web-push generate-vapid-keys
 - ✅ PWA installable
 - ✅ Dark mode
 - ✅ Docker ready
-- ✅ **Mode Offline-First** (IndexedDB + sync bidirectionnelle)
 
-### V1.1 (Futur)
+### V2.2+ (Futur)
 - [ ] Multi-utilisateurs complet
 - [ ] Export CSV/PDF
 - [ ] Budgets par catégorie
 - [ ] Objectifs d'épargne
 - [ ] Scanner OCR tickets
 
-### V2.0 (Futur lointain)
-- [ ] Connexion bancaire (API)
-- [ ] IA catégorisation automatique
-- [ ] Mode famille (comptes partagés)
-- [ ] Apps natives (React Native)
-
----
-
-## 🔧 Maintenance
-
-### Logs
-```bash
-docker compose logs -f
-```
-
-### Restart
-```bash
-docker compose restart
-```
-
-### Mise à jour
-```bash
-git pull
-docker compose up -d --build
-```
-
-### Réinitialiser la base
-```bash
-docker compose down
-rm data/budget.db
-docker compose up -d
-```
-
 ---
 
 ## ⚡ Performance
 
-- **SQLite WAL mode** : lecture/écriture concurrentes
+- **Instant Cache-First** : lecture locale IndexedDB immédiate pour toutes les pages
+- **Vite Manual Chunks** : découpage intelligent (`vendor-react`, `vendor-charts`, `vendor-icons`, `vendor-db`) réduisant le JS initial à ~80kB
+- **SQLite High-Perf PRAGMAs** : WAL mode, `synchronous = NORMAL`, 64MB RAM page cache, `temp_store = MEMORY`, 256MB memory mapped I/O
+- **Touch & Motion Optimizations** : `touch-action: manipulation`, `-webkit-tap-highlight-color: transparent`, micro-animations GPU
 - **Image compression** : Sharp réduit à 1200px max, qualité 80
-- **Bundle splitting** : Vite code splitting automatique
-- **Lazy loading** : Pages chargées à la demande
-- **Service Worker** : Cache des assets statiques
-- **Gzip** : Compression Express
+- **Service Worker v3** : Cache stale-while-revalidate des bundles et polices Google Fonts
+- **Gzip** : Compression Express native
 
 ---
 

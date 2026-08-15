@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Plus, Wallet, ArrowDownCircle, ArrowUpCircle, Edit3, ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react';
+import { Eye, EyeOff, Plus, Wallet, ArrowDownCircle, ArrowUpCircle, Edit3, ArrowUpRight, ArrowDownRight, Minus, TrendingUp, Sparkles } from 'lucide-react';
 import { offlineApi as api } from '../utils/offlineApi.js';
 import { formatMoney, formatDate, today } from '../utils/format';
 import { useAuth } from '../context/AuthContext';
+import { sync, syncEvents } from '../utils/syncEngine.js';
+import { usePullToRefresh } from '../hooks/usePullToRefresh.js';
+import PullToRefresh from '../components/PullToRefresh.jsx';
 import toast from 'react-hot-toast';
 import ExpenseModal from '../components/ExpenseModal';
 
@@ -21,7 +24,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [monthComparison, setMonthComparison] = useState(null);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (isInitial = false) => {
     try {
       const [budgetData, summaryData, expensesData, cats, historyData] = await Promise.all([
         api.getBudget(),
@@ -30,10 +33,10 @@ export default function Dashboard() {
         api.getCategories(),
         api.getHistory(2),
       ]);
-      setBalance(budgetData.balance);
+      setBalance(budgetData?.balance ?? 0);
       setSummary(summaryData);
-      setRecentExpenses(expensesData.expenses);
-      setCategories(cats);
+      setRecentExpenses(expensesData?.expenses || []);
+      setCategories(cats || []);
 
       // Calculate month comparison
       if (historyData && historyData.length >= 2) {
@@ -62,13 +65,33 @@ export default function Dashboard() {
         });
       }
     } catch (err) {
-      toast.error('Erreur de chargement');
+      console.warn('[Dashboard] loadData error:', err);
+      if (isInitial) toast.error('Erreur de chargement');
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => {
+    loadData(true);
+
+    // Auto-refresh when background sync completes or local data changes
+    const unsubSync = syncEvents.on('syncComplete', () => loadData(false));
+    const unsubPending = syncEvents.on('pendingChange', () => loadData(false));
+
+    return () => {
+      unsubSync();
+      unsubPending();
+    };
+  }, [loadData]);
+
+  // Mobile pull to refresh
+  const handlePullRefresh = useCallback(async () => {
+    await sync();
+    await loadData(false);
+  }, [loadData]);
+
+  const { pullDistance, isRefreshing, isReady } = usePullToRefresh(handlePullRefresh);
 
   const handleBalanceUpdate = async () => {
     const val = parseFloat(newBalance);
@@ -83,24 +106,21 @@ export default function Dashboard() {
 
   const handleExpenseAdded = (type) => {
     setShowExpenseModal(false);
-    loadData();
+    loadData(false);
     toast.success(type === 'income' ? 'Revenu ajouté' : 'Dépense ajoutée');
   };
 
-  if (loading) {
-    return (
-      <div>
-        <div className="skeleton" style={{ height: 160, borderRadius: 20, marginBottom: 16 }} />
-        <div className="stats-grid">
-          <div className="skeleton" style={{ height: 90, borderRadius: 10 }} />
-          <div className="skeleton" style={{ height: 90, borderRadius: 10 }} />
-        </div>
-      </div>
-    );
-  }
+  const toggleBalance = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (navigator.vibrate) navigator.vibrate(10);
+    setShowBalance(s => !s);
+  };
 
   return (
-    <div>
+    <div className="dashboard-container">
+      <PullToRefresh pullDistance={pullDistance} isRefreshing={isRefreshing} isReady={isReady} />
+
       <div className="page-header flex items-center justify-between">
         <div>
           <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Bonjour,</div>
@@ -109,21 +129,21 @@ export default function Dashboard() {
       </div>
 
       {/* Balance Card */}
-      <div className="balance-card" id="balance-card">
+      <div className="balance-card active-card" id="balance-card">
         <div className="balance-label">
           <Wallet size={16} />
           <span>Solde du compte</span>
-          <button className="balance-toggle" onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); setShowBalance(s => !s); }} style={{ marginLeft: 'auto' }}>
+          <button className="balance-toggle" onPointerDown={toggleBalance} style={{ marginLeft: 'auto' }}>
             {showBalance ? <EyeOff size={18} /> : <Eye size={18} />}
           </button>
         </div>
         {showBalance ? (
-          <div className={`balance-amount ${balance < 0 ? 'negative' : ''}`} onClick={() => { setNewBalance(String(balance || 0)); setShowBalanceEdit(true); }} style={{ cursor: 'pointer' }}>
-            {formatMoney(balance)}
+          <div className={`balance-amount ${balance < 0 ? 'negative' : ''}`} onClick={() => { setNewBalance(String(balance ?? 0)); setShowBalanceEdit(true); }} style={{ cursor: 'pointer' }}>
+            {formatMoney(balance ?? 0)}
             <Edit3 size={16} style={{ marginLeft: 8, opacity: 0.5, verticalAlign: 'middle' }} />
           </div>
         ) : (
-          <div className="balance-hidden">• • • • •</div>
+          <div className="balance-hidden" onClick={toggleBalance} style={{ cursor: 'pointer' }}>• • • • •</div>
         )}
       </div>
 
@@ -218,9 +238,27 @@ export default function Dashboard() {
       )}
 
       {/* Recent Activities */}
-      <div className="section-title mt-4">Dernières activités</div>
+      <div className="section-title mt-4 flex items-center justify-between">
+        <span>Dernières activités</span>
+        {recentExpenses.length > 0 && (
+          <button className="btn btn-ghost btn-sm" style={{ padding: '4px 8px', fontSize: '0.8rem' }} onClick={() => navigate('/expenses')}>
+            Voir tout →
+          </button>
+        )}
+      </div>
+
       <div className="card">
-        {recentExpenses.length === 0 ? (
+        {loading && recentExpenses.length === 0 ? (
+          Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="expense-item">
+              <div className="skeleton" style={{ width: 44, height: 44, borderRadius: 12 }} />
+              <div style={{ flex: 1 }}>
+                <div className="skeleton" style={{ width: '60%', height: 16, marginBottom: 6 }} />
+                <div className="skeleton" style={{ width: '40%', height: 12 }} />
+              </div>
+            </div>
+          ))
+        ) : recentExpenses.length === 0 ? (
           <div className="empty-state">
             <ArrowDownCircle size={40} />
             <p>Aucune activité</p>
@@ -230,7 +268,7 @@ export default function Dashboard() {
           recentExpenses.map(exp => {
             const isIncome = exp.type === 'income';
             return (
-              <div key={exp.id} className="expense-item" onClick={() => navigate('/expenses')}>
+              <div key={exp.id} className="expense-item active-item" onClick={() => navigate('/expenses')}>
                 <div className="expense-icon" style={{ background: isIncome ? 'rgba(16,185,129,0.15)' : (exp.category_color || '#64748b') + '20' }}>
                   <span style={{ fontSize: '1.2rem' }}>
                     {isIncome ? '💵' : getCategoryEmoji(exp.category_icon)}
@@ -250,15 +288,13 @@ export default function Dashboard() {
             );
           })
         )}
-        {recentExpenses.length > 0 && (
-          <button className="btn btn-ghost btn-block btn-sm mt-3" onClick={() => navigate('/expenses')}>
-            Voir tout
-          </button>
-        )}
       </div>
 
       {/* FAB */}
-      <button className="fab" onClick={() => setShowExpenseModal(true)} id="add-expense-fab">
+      <button className="fab" onClick={() => {
+        if (navigator.vibrate) navigator.vibrate(15);
+        setShowExpenseModal(true);
+      }} id="add-expense-fab">
         <Plus size={28} />
       </button>
 

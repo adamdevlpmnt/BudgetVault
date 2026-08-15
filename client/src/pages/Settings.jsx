@@ -1,8 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { LogOut, Lock, Calendar, Bell, BellOff, User, Plus, Trash2, X, RefreshCw, Sun, Moon } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { LogOut, Lock, Calendar, Bell, BellOff, User, Plus, Trash2, X, RefreshCw, Sun, Moon, Database } from 'lucide-react';
 import { offlineApi as api } from '../utils/offlineApi.js';
 import { useAuth } from '../context/AuthContext';
 import { formatMoney, CURRENCIES } from '../utils/format';
+import { sync, syncEvents } from '../utils/syncEngine.js';
+import { usePullToRefresh } from '../hooks/usePullToRefresh.js';
+import PullToRefresh from '../components/PullToRefresh.jsx';
 import toast from 'react-hot-toast';
 
 const CURRENCY_LIST = [
@@ -18,7 +21,6 @@ function getStoredTheme() {
 function applyTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
   localStorage.setItem('budgetvault-theme', theme);
-  // Update meta theme-color for mobile browser chrome
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', theme === 'light' ? '#f1f5f9' : '#0a0a1a');
 }
@@ -34,27 +36,60 @@ export default function Settings() {
   const [currency, setCurrencyState] = useState(user?.currency || 'EUR');
   const [pushEnabled, setPushEnabled] = useState(false);
   const [theme, setTheme] = useState(getStoredTheme());
+  const [isManualSyncing, setIsManualSyncing] = useState(false);
 
   const [pwForm, setPwForm] = useState({ current: '', newPw: '', confirm: '' });
   const [recForm, setRecForm] = useState({ type: 'income', amount: '', description: '', dayOfMonth: 1, categoryId: '' });
 
+  const loadData = useCallback(async () => {
+    try {
+      const [recs, cats] = await Promise.all([api.getRecurring(), api.getCategories()]);
+      setRecurring(recs || []);
+      setCategories(cats || []);
+    } catch (err) {
+      console.warn('[Settings] loadData error:', err);
+    }
+  }, []);
+
   useEffect(() => {
     loadData();
     checkPush();
-    // Apply stored theme on mount
     applyTheme(getStoredTheme());
-  }, []);
 
-  const loadData = async () => {
-    try {
-      const [recs, cats] = await Promise.all([api.getRecurring(), api.getCategories()]);
-      setRecurring(recs);
-      setCategories(cats);
-    } catch {}
-  };
+    const unsubSync = syncEvents.on('syncComplete', () => loadData());
+    return () => unsubSync();
+  }, [loadData]);
+
+  // Mobile pull to refresh
+  const handlePullRefresh = useCallback(async () => {
+    await sync();
+    await loadData();
+  }, [loadData]);
+
+  const { pullDistance, isRefreshing, isReady } = usePullToRefresh(handlePullRefresh);
 
   const checkPush = async () => {
     if ('Notification' in window) setPushEnabled(Notification.permission === 'granted');
+  };
+
+  const handleManualSync = async () => {
+    if (navigator.vibrate) navigator.vibrate(15);
+    setIsManualSyncing(true);
+    try {
+      const res = await sync();
+      if (res?.status === 'ok') {
+        toast.success('Données synchronisées !');
+      } else if (res?.status === 'offline') {
+        toast.error('Vous êtes hors ligne');
+      } else {
+        toast.success('Synchronisation effectuée');
+      }
+      await loadData();
+    } catch {
+      toast.error('Erreur de synchronisation');
+    } finally {
+      setIsManualSyncing(false);
+    }
   };
 
   const handleCycleDayChange = async (val) => {
@@ -62,6 +97,7 @@ export default function Settings() {
     if (day < 1 || day > 28) return;
     setCycleDay(day);
     try {
+      if (navigator.vibrate) navigator.vibrate(10);
       await api.updateSettings({ cycleStartDay: day });
       updateUser({ cycleStartDay: day });
       toast.success('Jour de cycle mis à jour');
@@ -71,6 +107,7 @@ export default function Settings() {
   const handleCurrencyChange = async (code) => {
     setCurrencyState(code);
     try {
+      if (navigator.vibrate) navigator.vibrate(10);
       await api.updateSettings({ currency: code });
       updateUser({ currency: code });
       toast.success(`Devise changée : ${CURRENCY_LIST.find(c => c.code === code)?.label}`);
@@ -78,6 +115,7 @@ export default function Settings() {
   };
 
   const handleThemeChange = (newTheme) => {
+    if (navigator.vibrate) navigator.vibrate(10);
     setTheme(newTheme);
     applyTheme(newTheme);
   };
@@ -121,6 +159,7 @@ export default function Settings() {
   const saveRecurring = async () => {
     if (!recForm.amount || !recForm.description) { toast.error('Remplissez tous les champs'); return; }
     try {
+      if (navigator.vibrate) navigator.vibrate(15);
       if (editRec) { await api.updateRecurring(editRec.id, recForm); }
       else { await api.createRecurring(recForm); }
       toast.success(editRec ? 'Modifié' : 'Créé');
@@ -131,15 +170,21 @@ export default function Settings() {
   };
 
   const deleteRecurring = async (id) => {
-    if (!confirm('Supprimer ?')) return;
-    try { await api.deleteRecurring(id); toast.success('Supprimé'); loadData(); }
-    catch { toast.error('Erreur'); }
+    if (!confirm('Supprimer ce récurrent ?')) return;
+    try {
+      if (navigator.vibrate) navigator.vibrate(20);
+      await api.deleteRecurring(id);
+      toast.success('Supprimé');
+      loadData();
+    } catch { toast.error('Erreur'); }
   };
 
   const currencySymbol = CURRENCY_LIST.find(c => c.code === currency)?.symbol || '€';
 
   return (
-    <div>
+    <div className="settings-container">
+      <PullToRefresh pullDistance={pullDistance} isRefreshing={isRefreshing} isReady={isReady} />
+
       <div className="page-header">
         <h1 className="page-title">Réglages</h1>
       </div>
@@ -151,6 +196,26 @@ export default function Settings() {
             <div className="settings-item-label flex items-center gap-2"><User size={16} /> {user?.displayName || user?.username}</div>
             <div className="settings-item-desc">@{user?.username}</div>
           </div>
+        </div>
+      </div>
+
+      {/* Manual Sync Trigger */}
+      <div className="section-title">Synchronisation & Cache</div>
+      <div className="card mb-4">
+        <div className="settings-item" style={{ border: 'none' }}>
+          <div className="settings-item-info">
+            <div className="settings-item-label flex items-center gap-2"><Database size={16} /> Données locales</div>
+            <div className="settings-item-desc">Forcer la synchronisation avec le serveur</div>
+          </div>
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={handleManualSync}
+            disabled={isManualSyncing}
+            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+          >
+            <RefreshCw size={14} className={isManualSyncing ? 'pull-spinner' : ''} />
+            {isManualSyncing ? 'Sync...' : 'Synchroniser'}
+          </button>
         </div>
       </div>
 

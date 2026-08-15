@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { X, Camera, ZoomIn, ArrowDownCircle, ArrowUpCircle } from 'lucide-react';
+import { X, Camera, ZoomIn, ArrowDownCircle, ArrowUpCircle, Calendar, Plus, Sparkles } from 'lucide-react';
 import { offlineApi as api } from '../utils/offlineApi.js';
 import { today, getCurrency, CURRENCIES } from '../utils/format';
 import toast from 'react-hot-toast';
@@ -25,7 +25,7 @@ export default function ExpenseModal({ categories, onClose, onSaved, expense }) 
 
   const getReceiptUrl = (img) => {
     if (!img) return null;
-    if (img.startsWith('http') || img.startsWith('blob:')) return img;
+    if (img.startsWith('http') || img.startsWith('blob:') || img.startsWith('data:')) return img;
     if (img.startsWith('/uploads/')) return `${apiBase}${img}`;
     return `${apiBase}/uploads/${img}`;
   };
@@ -44,13 +44,18 @@ export default function ExpenseModal({ categories, onClose, onSaved, expense }) 
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!amount || parseFloat(amount) <= 0) { toast.error('Montant invalide'); return; }
+    const numAmount = parseFloat(amount);
+    if (!amount || isNaN(numAmount) || numAmount <= 0) {
+      toast.error('Montant invalide');
+      return;
+    }
     setSaving(true);
     try {
+      if (navigator.vibrate) navigator.vibrate(15);
       const data = {
-        amount: parseFloat(amount),
-        description,
-        note,
+        amount: numAmount,
+        description: description.trim(),
+        note: note.trim(),
         date,
         categoryId: activeTab === 'expense' ? (categoryId || null) : null,
         receiptImage: activeTab === 'expense' ? receiptImage : null,
@@ -64,9 +69,30 @@ export default function ExpenseModal({ categories, onClose, onSaved, expense }) 
   };
 
   const handleTabChange = (tab) => {
-    if (isEditing) return; // Don't allow tab change when editing
+    if (isEditing) return;
+    if (navigator.vibrate) navigator.vibrate(10);
     setActiveTab(tab);
   };
+
+  const addAmountPreset = (addVal) => {
+    if (navigator.vibrate) navigator.vibrate(8);
+    const current = parseFloat(amount) || 0;
+    setAmount(String(Math.round((current + addVal) * 100) / 100));
+  };
+
+  const setDatePreset = (preset) => {
+    if (navigator.vibrate) navigator.vibrate(8);
+    const d = new Date();
+    if (preset === 'yesterday') {
+      d.setDate(d.getDate() - 1);
+    } else if (preset === 'dayBefore') {
+      d.setDate(d.getDate() - 2);
+    }
+    setDate(d.toISOString().split('T')[0]);
+  };
+
+  const todayStr = today();
+  const yesterdayStr = new Date(Date.now() - 86400000).toISOString().split('T')[0];
 
   return (
     <>
@@ -101,13 +127,39 @@ export default function ExpenseModal({ categories, onClose, onSaved, expense }) 
 
           <form onSubmit={handleSubmit}>
             <div className="input-group">
-              <label>Montant ({currencySymbol})</label>
+              <div className="flex items-center justify-between mb-1">
+                <label style={{ margin: 0 }}>Montant ({currencySymbol})</label>
+                {amount && (
+                  <button
+                    type="button"
+                    className="btn-link"
+                    style={{ fontSize: '0.75rem', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}
+                    onClick={() => setAmount('')}
+                  >
+                    Effacer
+                  </button>
+                )}
+              </div>
               <input
                 className={`input input-amount ${activeTab === 'income' ? 'input-amount-income' : ''}`}
                 type="number" inputMode="decimal" step="0.01" min="0.01"
                 value={amount} onChange={e => setAmount(e.target.value)}
                 placeholder="0.00" autoFocus required
               />
+
+              {/* Quick Amount Presets */}
+              <div className="amount-presets-row mt-2">
+                {[5, 10, 20, 50, 100].map(val => (
+                  <button
+                    key={val}
+                    type="button"
+                    className="amount-preset-chip"
+                    onClick={() => addAmountPreset(val)}
+                  >
+                    +{val}{currencySymbol}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {activeTab === 'expense' && (
@@ -115,7 +167,15 @@ export default function ExpenseModal({ categories, onClose, onSaved, expense }) 
                 <label>Catégorie</label>
                 <div className="category-grid">
                   {categories.map(cat => (
-                    <button type="button" key={cat.id} className={`category-chip ${categoryId == cat.id ? 'selected' : ''}`} onClick={() => setCategoryId(cat.id)}>
+                    <button
+                      type="button"
+                      key={cat.id}
+                      className={`category-chip ${categoryId == cat.id ? 'selected' : ''}`}
+                      onClick={() => {
+                        if (navigator.vibrate) navigator.vibrate(8);
+                        setCategoryId(cat.id);
+                      }}
+                    >
                       <div className="category-chip-icon" style={{ background: cat.color + '25' }}>
                         <span style={{ fontSize: '1rem' }}>{getCatEmoji(cat.icon)}</span>
                       </div>
@@ -128,18 +188,39 @@ export default function ExpenseModal({ categories, onClose, onSaved, expense }) 
 
             <div className="input-group">
               <label>Description</label>
-              <input className="input" type="text" value={description} onChange={e => setDescription(e.target.value)}
-                placeholder={activeTab === 'income' ? 'Ex: Salaire, Freelance...' : 'Ex: Courses Carrefour'} />
+              <input
+                className="input"
+                type="text"
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                placeholder={activeTab === 'income' ? 'Ex: Salaire, Freelance...' : 'Ex: Courses Carrefour, Restaurant...'}
+              />
             </div>
 
             <div className="input-group">
               <label>Date</label>
+              <div className="date-presets-row mb-2">
+                <button
+                  type="button"
+                  className={`date-preset-chip ${date === todayStr ? 'active' : ''}`}
+                  onClick={() => setDatePreset('today')}
+                >
+                  Aujourd'hui
+                </button>
+                <button
+                  type="button"
+                  className={`date-preset-chip ${date === yesterdayStr ? 'active' : ''}`}
+                  onClick={() => setDatePreset('yesterday')}
+                >
+                  Hier
+                </button>
+              </div>
               <input className="input" type="date" value={date} onChange={e => setDate(e.target.value)} required />
             </div>
 
             <div className="input-group">
               <label>Note (optionnel)</label>
-              <textarea className="input" value={note} onChange={e => setNote(e.target.value)} placeholder="Note..." rows={2} />
+              <textarea className="input" value={note} onChange={e => setNote(e.target.value)} placeholder="Détails supplémentaires..." rows={2} />
             </div>
 
             {activeTab === 'expense' && (
@@ -180,6 +261,7 @@ export default function ExpenseModal({ categories, onClose, onSaved, expense }) 
               type="submit"
               className={`btn btn-block ${activeTab === 'income' ? 'btn-success' : 'btn-primary'}`}
               disabled={saving}
+              style={{ marginTop: 8 }}
             >
               {saving ? 'Enregistrement...' : (
                 isEditing ? 'Modifier' : (
@@ -210,6 +292,12 @@ export default function ExpenseModal({ categories, onClose, onSaved, expense }) 
 }
 
 function getCatEmoji(icon) {
-  const m = { 'shopping-cart':'🛒','car':'🚗','home':'🏠','gamepad-2':'🎮','heart-pulse':'❤️','shirt':'👕','book-open':'📚','utensils':'🍽️','repeat':'🔄','package':'📦','tag':'🏷️','coffee':'☕','gift':'🎁','plane':'✈️','music':'🎵','smartphone':'📱','zap':'⚡','droplet':'💧','baby':'👶','dog':'🐕','dumbbell':'💪','graduation-cap':'🎓','wrench':'🔧','beef':'🥩','fish':'🐟','apple':'🍎' };
+  const m = {
+    'shopping-cart':'🛒','car':'🚗','home':'🏠','gamepad-2':'🎮','heart-pulse':'❤️',
+    'shirt':'👕','book-open':'📚','utensils':'🍽️','repeat':'🔄','package':'📦',
+    'tag':'🏷️','coffee':'☕','gift':'🎁','plane':'✈️','music':'🎵','smartphone':'📱',
+    'zap':'⚡','droplet':'💧','baby':'👶','dog':'🐕','dumbbell':'💪','graduation-cap':'🎓',
+    'wrench':'🔧','beef':'🥩','fish':'🐟','apple':'🍎'
+  };
   return m[icon] || '💰';
 }

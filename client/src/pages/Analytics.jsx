@@ -1,10 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement } from 'chart.js';
 import { Doughnut, Bar } from 'react-chartjs-2';
-import { PieChart, BarChart3, Calendar } from 'lucide-react';
+import { PieChart, BarChart3, Calendar, RefreshCw } from 'lucide-react';
 import { offlineApi as api } from '../utils/offlineApi.js';
 import { useAuth } from '../context/AuthContext';
 import { formatMoney, formatDate, formatDateFull, cycleName, getCurrency, CURRENCIES } from '../utils/format';
+import { sync, syncEvents } from '../utils/syncEngine.js';
+import { usePullToRefresh } from '../hooks/usePullToRefresh.js';
+import PullToRefresh from '../components/PullToRefresh.jsx';
 import toast from 'react-hot-toast';
 
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement);
@@ -18,28 +21,50 @@ export default function Analytics() {
   const [dateRange, setDateRange] = useState({ startDate: '', endDate: '' });
   const [useCustomRange, setUseCustomRange] = useState(false);
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async (params = {}) => {
-    setLoading(true);
+  const loadData = useCallback(async (params = {}, isInitial = false) => {
+    if (isInitial && !categoryData) setLoading(true);
     try {
       const [catData, histData] = await Promise.all([
         api.getByCategory(params),
         api.getHistory(12),
       ]);
       setCategoryData(catData);
-      setHistory(histData);
+      setHistory(Array.isArray(histData) ? histData : (histData?.history || []));
 
-      // Store cycle dates from the API response (default = current cycle)
-      if (!params.startDate && catData.startDate && catData.endDate) {
+      // Store cycle dates from response
+      if (!params.startDate && catData?.startDate && catData?.endDate) {
         setCycleDates({ startDate: catData.startDate, endDate: catData.endDate });
-        setDateRange({ startDate: catData.startDate, endDate: catData.endDate });
+        if (!useCustomRange) {
+          setDateRange({ startDate: catData.startDate, endDate: catData.endDate });
+        }
       }
-    } catch { toast.error('Erreur de chargement'); }
-    finally { setLoading(false); }
-  };
+    } catch (err) {
+      console.warn('[Analytics] loadData error:', err);
+      if (isInitial) toast.error('Erreur de chargement');
+    } finally {
+      setLoading(false);
+    }
+  }, [useCustomRange, categoryData]);
+
+  useEffect(() => {
+    loadData({}, true);
+
+    const unsubSync = syncEvents.on('syncComplete', () => loadData(useCustomRange ? dateRange : {}, false));
+    const unsubPending = syncEvents.on('pendingChange', () => loadData(useCustomRange ? dateRange : {}, false));
+
+    return () => {
+      unsubSync();
+      unsubPending();
+    };
+  }, [loadData, useCustomRange, dateRange]);
+
+  // Mobile pull to refresh
+  const handlePullRefresh = useCallback(async () => {
+    await sync();
+    await loadData(useCustomRange ? dateRange : {}, false);
+  }, [loadData, useCustomRange, dateRange]);
+
+  const { pullDistance, isRefreshing, isReady } = usePullToRefresh(handlePullRefresh);
 
   const handleFilter = () => {
     if (dateRange.startDate && dateRange.endDate) {
@@ -51,16 +76,16 @@ export default function Analytics() {
   const resetFilter = () => {
     setUseCustomRange(false);
     setDateRange({ startDate: cycleDates.startDate, endDate: cycleDates.endDate });
-    loadData();
+    loadData({});
   };
 
   const currencySymbol = CURRENCIES[getCurrency()]?.symbol || '€';
 
   const pieData = categoryData ? {
-    labels: categoryData.categories.map(c => c.name),
+    labels: (categoryData.categories || []).map(c => c.name),
     datasets: [{
-      data: categoryData.categories.map(c => c.total),
-      backgroundColor: categoryData.categories.map(c => c.color),
+      data: (categoryData.categories || []).map(c => c.total),
+      backgroundColor: (categoryData.categories || []).map(c => c.color),
       borderColor: 'transparent',
       borderWidth: 0,
       hoverOffset: 8,
@@ -71,6 +96,7 @@ export default function Analytics() {
     responsive: true,
     maintainAspectRatio: false,
     cutout: '65%',
+    animation: { duration: 300 },
     plugins: {
       legend: { display: false },
       tooltip: {
@@ -82,17 +108,17 @@ export default function Analytics() {
         padding: 12,
         cornerRadius: 8,
         callbacks: {
-          label: (ctx) => ` ${formatMoney(ctx.raw)} (${categoryData.categories[ctx.dataIndex].percentage}%)`,
+          label: (ctx) => ` ${formatMoney(ctx.raw)} (${categoryData?.categories?.[ctx.dataIndex]?.percentage || 0}%)`,
         },
       },
     },
   };
 
   const barData = {
-    labels: history.map(h => cycleName(h.cycleKey)).reverse(),
+    labels: history.map(h => cycleName(h.cycleKey || h.cycle_key)).reverse(),
     datasets: [{
       label: 'Dépenses',
-      data: history.map(h => h.totalExpenses).reverse(),
+      data: history.map(h => h.totalExpenses ?? h.total ?? 0).reverse(),
       backgroundColor: 'rgba(99, 102, 241, 0.6)',
       borderColor: '#6366f1',
       borderWidth: 1,
@@ -103,6 +129,7 @@ export default function Analytics() {
   const barOptions = {
     responsive: true,
     maintainAspectRatio: false,
+    animation: { duration: 300 },
     plugins: {
       legend: { display: false },
       tooltip: {
@@ -129,17 +156,10 @@ export default function Analytics() {
       ? `Cycle : ${formatDateFull(cycleDates.startDate)} → ${formatDateFull(cycleDates.endDate)}`
       : '';
 
-  if (loading) {
-    return (
-      <div>
-        <div className="page-header"><h1 className="page-title">Statistiques</h1></div>
-        <div className="skeleton" style={{ height: 300, borderRadius: 16 }} />
-      </div>
-    );
-  }
-
   return (
-    <div>
+    <div className="analytics-container">
+      <PullToRefresh pullDistance={pullDistance} isRefreshing={isRefreshing} isReady={isReady} />
+
       <div className="page-header">
         <h1 className="page-title">Statistiques</h1>
         <p className="page-subtitle">{periodLabel}</p>
@@ -169,7 +189,9 @@ export default function Analytics() {
           <PieChart size={18} color="var(--primary-light)" />
           Répartition par catégorie
         </div>
-        {categoryData && categoryData.categories.length > 0 ? (
+        {loading && !categoryData ? (
+          <div className="skeleton" style={{ height: 250, borderRadius: 16 }} />
+        ) : categoryData && categoryData.categories && categoryData.categories.length > 0 ? (
           <>
             <div style={{ height: 250, position: 'relative' }}>
               <Doughnut data={pieData} options={pieOptions} />
