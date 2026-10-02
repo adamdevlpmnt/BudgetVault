@@ -1,27 +1,87 @@
-import React, { useState, useRef } from 'react';
-import { X, Camera, ZoomIn, ArrowDownCircle, ArrowUpCircle, Calendar, Plus, Sparkles } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Camera, ZoomIn, Calendar, Repeat, Check, Banknote, CreditCard, Landmark } from 'lucide-react';
 import { offlineApi as api } from '../utils/offlineApi.js';
 import { today, getCurrency, CURRENCIES } from '../utils/format';
+import Keypad from './Keypad.jsx';
 import toast from 'react-hot-toast';
 
-export default function ExpenseModal({ categories, onClose, onSaved, expense }) {
+export default function ExpenseModal({ categories: propCategories, onClose, onSaved, expense }) {
   const isEditing = !!expense;
   const initialTab = expense?.type === 'income' ? 'income' : 'expense';
 
   const [activeTab, setActiveTab] = useState(initialTab);
-  const [amount, setAmount] = useState(expense?.amount || '');
+  const [amountStr, setAmountStr] = useState(expense ? String(expense.amount) : '');
   const [description, setDescription] = useState(expense?.description || '');
   const [note, setNote] = useState(expense?.note || '');
   const [date, setDate] = useState(expense?.date || today());
   const [categoryId, setCategoryId] = useState(expense?.category_id || '');
+  const [paymentMethod, setPaymentMethod] = useState('Cash'); // 'Cash' | 'Card' | 'Transfer'
+  const [repeatMonthly, setRepeatMonthly] = useState(false);
   const [receiptImage, setReceiptImage] = useState(expense?.receipt_image || null);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [categories, setCategories] = useState(propCategories || []);
   const [showReceiptLightbox, setShowReceiptLightbox] = useState(false);
   const fileRef = useRef();
 
   const apiBase = import.meta.env.DEV ? 'http://localhost:3001' : '';
-  const currencySymbol = CURRENCIES[getCurrency()]?.symbol || '€';
+  const activeCurrency = getCurrency();
+  const currencySymbol = activeCurrency === 'DZD' ? 'DA' : (CURRENCIES[activeCurrency]?.symbol || '€');
+
+  // Load categories if not passed
+  useEffect(() => {
+    if (!propCategories || propCategories.length === 0) {
+      api.getCategories().then(c => {
+        if (c && c.length > 0) {
+          setCategories(c);
+          if (!categoryId && !isEditing) {
+            setCategoryId(c[0].id);
+          }
+        }
+      });
+    } else if (!categoryId && propCategories.length > 0 && !isEditing) {
+      setCategoryId(propCategories[0].id);
+    }
+  }, [propCategories, categoryId, isEditing]);
+
+  // Handle keyboard typing on desktop
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // If focus is in an input or textarea, let default typing occur
+      if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return;
+
+      if (e.key >= '0' && e.key <= '9') {
+        handleDigit(e.key);
+      } else if (e.key === '.' || e.key === ',') {
+        handleDigit('.');
+      } else if (e.key === 'Backspace') {
+        handleDelete();
+      } else if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [amountStr]);
+
+  const handleDigit = (digit) => {
+    if (amountStr.length >= 10) return;
+    if (digit === '.' && amountStr.includes('.')) return;
+    if (amountStr === '0' && digit !== '.') {
+      setAmountStr(digit);
+    } else {
+      setAmountStr(prev => prev + digit);
+    }
+  };
+
+  const handleDelete = () => {
+    setAmountStr(prev => (prev.length > 1 ? prev.slice(0, -1) : ''));
+  };
+
+  const handleTripleZero = () => {
+    if (!amountStr || amountStr === '0' || amountStr.length >= 7) return;
+    setAmountStr(prev => prev + '000');
+  };
 
   const getReceiptUrl = (img) => {
     if (!img) return null;
@@ -37,58 +97,67 @@ export default function ExpenseModal({ categories, onClose, onSaved, expense }) 
     try {
       const data = await api.uploadReceipt(file);
       setReceiptImage(data.path);
-      toast.success('Image ajoutée');
-    } catch { toast.error('Erreur upload'); }
-    finally { setUploading(false); }
+      toast.success('Ticket photo ajouté');
+    } catch {
+      toast.error('Erreur upload ticket');
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    const numAmount = parseFloat(amount);
-    if (!amount || isNaN(numAmount) || numAmount <= 0) {
-      toast.error('Montant invalide');
+    if (e) e.preventDefault();
+    const numAmount = parseFloat(amountStr);
+    if (!amountStr || isNaN(numAmount) || numAmount <= 0) {
+      toast.error('Veuillez saisir un montant');
       return;
     }
+
     setSaving(true);
     try {
       if (navigator.vibrate) navigator.vibrate(15);
+
+      // Build note combining payment method if specified
+      let finalNote = note.trim();
+      if (paymentMethod && !finalNote.includes(`[${paymentMethod}]`)) {
+        finalNote = finalNote ? `${finalNote} • ${paymentMethod}` : paymentMethod;
+      }
+
       const data = {
         amount: numAmount,
-        description: description.trim(),
-        note: note.trim(),
+        description: description.trim() || (activeTab === 'income' ? 'Revenu' : 'Dépense'),
+        note: finalNote,
         date,
         categoryId: activeTab === 'expense' ? (categoryId || null) : null,
         receiptImage: activeTab === 'expense' ? receiptImage : null,
         type: activeTab,
       };
-      if (expense) { await api.updateExpense(expense.id, data); }
-      else { await api.createExpense(data); }
-      onSaved(activeTab);
-    } catch (err) { toast.error(err.message); }
-    finally { setSaving(false); }
-  };
 
-  const handleTabChange = (tab) => {
-    if (isEditing) return;
-    if (navigator.vibrate) navigator.vibrate(10);
-    setActiveTab(tab);
-  };
+      if (isEditing) {
+        await api.updateExpense(expense.id, data);
+      } else {
+        await api.createExpense(data);
 
-  const addAmountPreset = (addVal) => {
-    if (navigator.vibrate) navigator.vibrate(8);
-    const current = parseFloat(amount) || 0;
-    setAmount(String(Math.round((current + addVal) * 100) / 100));
-  };
+        // If recurring toggle was active, create recurring record as well
+        if (repeatMonthly) {
+          const day = new Date(date).getDate();
+          await api.createRecurring({
+            type: activeTab,
+            amount: numAmount,
+            description: data.description,
+            categoryId: data.categoryId,
+            dayOfMonth: Math.min(28, Math.max(1, day)),
+          }).catch(err => console.warn('Recurring creation error:', err));
+        }
+      }
 
-  const setDatePreset = (preset) => {
-    if (navigator.vibrate) navigator.vibrate(8);
-    const d = new Date();
-    if (preset === 'yesterday') {
-      d.setDate(d.getDate() - 1);
-    } else if (preset === 'dayBefore') {
-      d.setDate(d.getDate() - 2);
+      toast.success(isEditing ? 'Entrée modifiée' : (activeTab === 'income' ? 'Revenu enregistré' : 'Dépense enregistrée'));
+      if (onSaved) onSaved(activeTab);
+    } catch (err) {
+      toast.error(err.message || 'Erreur lors de l’enregistrement');
+    } finally {
+      setSaving(false);
     }
-    setDate(d.toISOString().split('T')[0]);
   };
 
   const todayStr = today();
@@ -97,194 +166,210 @@ export default function ExpenseModal({ categories, onClose, onSaved, expense }) 
   return (
     <>
       <div className="modal-overlay" onClick={onClose}>
-        <div className="modal" onClick={e => e.stopPropagation()}>
-          <div className="modal-header">
-            <h3 className="modal-title">{isEditing ? 'Modifier' : 'Nouvelle entrée'}</h3>
-            <button className="modal-close" onClick={onClose}><X size={18} /></button>
+        <div className="modal" onClick={e => e.stopPropagation()} style={{ paddingBottom: 'calc(24px + var(--safe-bottom))' }}>
+          
+          {/* Top Bar: Segmented Switch + Close */}
+          <div className="flex items-center justify-between mb-2">
+            {!isEditing ? (
+              <div className="type-toggle-tabs" style={{ margin: 0, padding: 3, width: 220 }}>
+                <button
+                  type="button"
+                  className={`type-tab ${activeTab === 'expense' ? 'active' : ''}`}
+                  onClick={() => {
+                    if (navigator.vibrate) navigator.vibrate(8);
+                    setActiveTab('expense');
+                  }}
+                  style={activeTab === 'expense' ? { background: '#ffffff', color: '#0b131e', fontWeight: 700 } : {}}
+                >
+                  Dépense
+                </button>
+                <button
+                  type="button"
+                  className={`type-tab ${activeTab === 'income' ? 'active' : ''}`}
+                  onClick={() => {
+                    if (navigator.vibrate) navigator.vibrate(8);
+                    setActiveTab('income');
+                  }}
+                  style={activeTab === 'income' ? { background: '#ffffff', color: '#0b131e', fontWeight: 700 } : {}}
+                >
+                  Revenu
+                </button>
+              </div>
+            ) : (
+              <h3 className="modal-title" style={{ margin: 0 }}>Modifier l'opération</h3>
+            )}
+
+            <button className="modal-close" onClick={onClose} aria-label="Fermer">
+              <X size={18} />
+            </button>
           </div>
 
-          {/* Tab Switcher */}
-          {!isEditing && (
-            <div className="modal-tabs">
-              <button
-                type="button"
-                className={`modal-tab ${activeTab === 'expense' ? 'active expense-active' : ''}`}
-                onClick={() => handleTabChange('expense')}
-              >
-                <ArrowDownCircle size={16} />
-                <span>Dépense</span>
-              </button>
-              <button
-                type="button"
-                className={`modal-tab ${activeTab === 'income' ? 'active income-active' : ''}`}
-                onClick={() => handleTabChange('income')}
-              >
-                <ArrowUpCircle size={16} />
-                <span>Revenu</span>
-              </button>
+          {/* Huge Amount Display (add.webp) */}
+          <div className="modal-amount-display">
+            <span className="modal-amount-val">
+              {amountStr ? Number(amountStr).toLocaleString('fr-FR', { maximumFractionDigits: 2 }) : '0'}
+            </span>
+            <span className="modal-currency-tag">{currencySymbol}</span>
+          </div>
+
+          {/* Category Squircles (add.webp) */}
+          {activeTab === 'expense' && categories.length > 0 && (
+            <div className="category-squircles-row">
+              {categories.map(cat => {
+                const isSelected = categoryId == cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    className={`category-squircle-btn ${isSelected ? 'active' : ''}`}
+                    onClick={() => {
+                      if (navigator.vibrate) navigator.vibrate(8);
+                      setCategoryId(cat.id);
+                    }}
+                  >
+                    <div
+                      className="squircle-badge"
+                      style={{
+                        background: isSelected ? cat.color : `${cat.color}25`,
+                        color: isSelected ? '#ffffff' : cat.color,
+                      }}
+                    >
+                      <span>{getCatEmoji(cat.icon)}</span>
+                    </div>
+                    <span>{cat.name}</span>
+                  </button>
+                );
+              })}
             </div>
           )}
 
-          <form onSubmit={handleSubmit}>
-            <div className="input-group">
-              <div className="flex items-center justify-between mb-1">
-                <label style={{ margin: 0 }}>Montant ({currencySymbol})</label>
-                {amount && (
-                  <button
-                    type="button"
-                    className="btn-link"
-                    style={{ fontSize: '0.75rem', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}
-                    onClick={() => setAmount('')}
-                  >
-                    Effacer
-                  </button>
-                )}
-              </div>
-              <input
-                className={`input input-amount ${activeTab === 'income' ? 'input-amount-income' : ''}`}
-                type="number" inputMode="decimal" step="0.01" min="0.01"
-                value={amount} onChange={e => setAmount(e.target.value)}
-                placeholder="0.00" autoFocus required
-              />
-
-              {/* Quick Amount Presets */}
-              <div className="amount-presets-row mt-2">
-                {[5, 10, 20, 50, 100].map(val => (
-                  <button
-                    key={val}
-                    type="button"
-                    className="amount-preset-chip"
-                    onClick={() => addAmountPreset(val)}
-                  >
-                    +{val}{currencySymbol}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {activeTab === 'expense' && (
-              <div className="input-group">
-                <label>Catégorie</label>
-                <div className="category-grid">
-                  {categories.map(cat => (
-                    <button
-                      type="button"
-                      key={cat.id}
-                      className={`category-chip ${categoryId == cat.id ? 'selected' : ''}`}
-                      onClick={() => {
-                        if (navigator.vibrate) navigator.vibrate(8);
-                        setCategoryId(cat.id);
-                      }}
-                    >
-                      <div className="category-chip-icon" style={{ background: cat.color + '25' }}>
-                        <span style={{ fontSize: '1rem' }}>{getCatEmoji(cat.icon)}</span>
-                      </div>
-                      <span className="category-chip-name">{cat.name}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="input-group">
-              <label>Description</label>
-              <input
-                className="input"
-                type="text"
-                value={description}
-                onChange={e => setDescription(e.target.value)}
-                placeholder={activeTab === 'income' ? 'Ex: Salaire, Freelance...' : 'Ex: Courses Carrefour, Restaurant...'}
-              />
-            </div>
-
-            <div className="input-group">
-              <label>Date</label>
-              <div className="date-presets-row mb-2">
-                <button
-                  type="button"
-                  className={`date-preset-chip ${date === todayStr ? 'active' : ''}`}
-                  onClick={() => setDatePreset('today')}
-                >
-                  Aujourd'hui
-                </button>
-                <button
-                  type="button"
-                  className={`date-preset-chip ${date === yesterdayStr ? 'active' : ''}`}
-                  onClick={() => setDatePreset('yesterday')}
-                >
-                  Hier
-                </button>
-              </div>
-              <input className="input" type="date" value={date} onChange={e => setDate(e.target.value)} required />
-            </div>
-
-            <div className="input-group">
-              <label>Note (optionnel)</label>
-              <textarea className="input" value={note} onChange={e => setNote(e.target.value)} placeholder="Détails supplémentaires..." rows={2} />
-            </div>
-
-            {activeTab === 'expense' && (
-              <div className="input-group">
-                <label>Ticket de caisse</label>
-                {receiptImage ? (
-                  <div className="flex items-center gap-3">
-                    <div style={{ position: 'relative', cursor: 'pointer' }} onClick={() => setShowReceiptLightbox(true)}>
-                      <img src={getReceiptUrl(receiptImage)} alt="Ticket" className="receipt-preview" />
-                      <div style={{
-                        position: 'absolute', bottom: 4, right: 4,
-                        background: 'rgba(0,0,0,0.6)', borderRadius: '50%',
-                        width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center'
-                      }}>
-                        <ZoomIn size={14} color="white" />
-                      </div>
-                    </div>
-                    <div className="flex-col gap-2">
-                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowReceiptLightbox(true)}>Voir en grand</button>
-                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => setReceiptImage(null)} style={{ color: 'var(--danger)' }}>Supprimer</button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="upload-zone" onClick={() => fileRef.current?.click()}>
-                    <input ref={fileRef} type="file" accept="image/*" onChange={handleImageUpload} hidden />
-                    {uploading ? <span>Upload en cours...</span> : (
-                      <>
-                        <Camera size={24} style={{ marginBottom: 4 }} />
-                        <div>Ajouter une photo</div>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
+          {/* Payment Method Selector (Cash, Carte, Virement) */}
+          <div className="payment-methods-row">
             <button
-              type="submit"
-              className={`btn btn-block ${activeTab === 'income' ? 'btn-success' : 'btn-primary'}`}
-              disabled={saving}
-              style={{ marginTop: 8 }}
+              type="button"
+              className={`payment-method-chip ${paymentMethod === 'Cash' ? 'active' : ''}`}
+              onClick={() => setPaymentMethod('Cash')}
             >
-              {saving ? 'Enregistrement...' : (
-                isEditing ? 'Modifier' : (
-                  activeTab === 'income' ? 'Ajouter le revenu' : 'Ajouter la dépense'
-                )
-              )}
+              <Banknote size={16} /> Espèces
             </button>
-          </form>
+            <button
+              type="button"
+              className={`payment-method-chip ${paymentMethod === 'Card' ? 'active' : ''}`}
+              onClick={() => setPaymentMethod('Card')}
+            >
+              <CreditCard size={16} /> Carte
+            </button>
+            <button
+              type="button"
+              className={`payment-method-chip ${paymentMethod === 'Transfer' ? 'active' : ''}`}
+              onClick={() => setPaymentMethod('Transfer')}
+            >
+              <Landmark size={16} /> Virement
+            </button>
+          </div>
+
+          {/* Description & Note Input */}
+          <div className="flex gap-2 mb-2">
+            <input
+              className="input"
+              type="text"
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              placeholder={activeTab === 'income' ? 'Libellé (ex: Salaire, Freelance...)' : 'Libellé (ex: Marché, Café, Yassir...)'}
+              style={{ flex: 2, padding: '10px 14px', minHeight: 42, fontSize: '0.9rem' }}
+            />
+            <input
+              type="date"
+              className="input"
+              value={date}
+              onChange={e => setDate(e.target.value)}
+              style={{ flex: 1, padding: '10px 12px', minHeight: 42, fontSize: '0.85rem' }}
+            />
+          </div>
+
+          {/* Recurrence Toggle Button */}
+          {!isEditing && (
+            <div
+              className={`repeat-monthly-toggle ${repeatMonthly ? 'active' : ''}`}
+              onClick={() => setRepeatMonthly(r => !r)}
+            >
+              <div className="flex items-center gap-2">
+                <Repeat size={16} />
+                <span>Répéter chaque mois (récurrent)</span>
+              </div>
+              <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>
+                {repeatMonthly ? '✓ Activé' : 'Désactivé'}
+              </span>
+            </div>
+          )}
+
+          {/* Photo ticket attachment */}
+          {activeTab === 'expense' && (
+            <div className="mb-2">
+              {receiptImage ? (
+                <div className="flex items-center justify-between" style={{ background: 'var(--bg-elevated)', padding: '8px 12px', borderRadius: 12 }}>
+                  <div className="flex items-center gap-2" onClick={() => setShowReceiptLightbox(true)} style={{ cursor: 'pointer' }}>
+                    <img src={getReceiptUrl(receiptImage)} alt="Ticket" style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'cover' }} />
+                    <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>Ticket attaché</span>
+                  </div>
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => setReceiptImage(null)} style={{ color: 'var(--danger)', padding: 4 }}>
+                    Retirer
+                  </button>
+                </div>
+              ) : (
+                <div
+                  className="flex items-center justify-center gap-2"
+                  style={{ background: 'var(--bg-elevated)', padding: '8px 12px', borderRadius: 12, cursor: 'pointer', border: '1px dashed var(--border)' }}
+                  onClick={() => fileRef.current?.click()}
+                >
+                  <input ref={fileRef} type="file" accept="image/*" onChange={handleImageUpload} hidden />
+                  <Camera size={16} color="var(--text-muted)" />
+                  <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                    {uploading ? 'Upload...' : 'Ajouter photo du ticket'}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Custom Numpad (add.webp) */}
+          <Keypad
+            onKeyPress={handleDigit}
+            onDelete={handleDelete}
+            onTripleZero={handleTripleZero}
+          />
+
+          {/* Save Button */}
+          <button
+            type="button"
+            className="btn btn-block"
+            onClick={handleSubmit}
+            disabled={saving || !amountStr || parseFloat(amountStr) <= 0}
+            style={{
+              background: 'linear-gradient(135deg, #f59e0b, #fbbf24)',
+              color: '#0b131e',
+              fontWeight: 800,
+              fontSize: '1.05rem',
+              borderRadius: 16,
+              padding: '14px 20px',
+              border: 'none',
+              boxShadow: '0 4px 18px rgba(245, 158, 11, 0.4)',
+            }}
+          >
+            {saving ? 'Enregistrement...' : (
+              isEditing ? '✓ Mettre à jour' : (activeTab === 'income' ? '✓ Enregistrer le revenu' : '✓ Enregistrer la dépense')
+            )}
+          </button>
         </div>
       </div>
 
-      {/* Receipt Lightbox */}
+      {/* Lightbox for receipt photo */}
       {showReceiptLightbox && receiptImage && (
         <div className="lightbox-overlay" onClick={() => setShowReceiptLightbox(false)}>
           <button className="lightbox-close" onClick={() => setShowReceiptLightbox(false)}>
             <X size={24} />
           </button>
-          <img
-            src={getReceiptUrl(receiptImage)}
-            alt="Ticket de caisse"
-            className="lightbox-image"
-            onClick={(e) => e.stopPropagation()}
-          />
+          <img src={getReceiptUrl(receiptImage)} alt="Ticket" className="lightbox-image" onClick={e => e.stopPropagation()} />
         </div>
       )}
     </>

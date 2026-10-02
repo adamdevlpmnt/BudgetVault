@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { LogOut, Lock, Calendar, Bell, BellOff, User, Plus, Trash2, X, RefreshCw, Sun, Moon, Database } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { LogOut, Lock, Calendar, Bell, BellOff, User, Plus, Trash2, X, RefreshCw, Sun, Moon, Database, ArrowLeft } from 'lucide-react';
 import { offlineApi as api } from '../utils/offlineApi.js';
 import { useAuth } from '../context/AuthContext';
 import { formatMoney, CURRENCIES } from '../utils/format';
@@ -26,6 +27,7 @@ function applyTheme(theme) {
 }
 
 export default function Settings() {
+  const navigate = useNavigate();
   const { user, logout, updateUser } = useAuth();
   const [recurring, setRecurring] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -185,8 +187,15 @@ export default function Settings() {
     <div className="settings-container">
       <PullToRefresh pullDistance={pullDistance} isRefreshing={isRefreshing} isReady={isReady} />
 
-      <div className="page-header">
-        <h1 className="page-title">Réglages</h1>
+      <div className="page-header flex items-center justify-between">
+        <h1 className="page-title" style={{ fontSize: '1.9rem', fontWeight: 900, margin: 0 }}>Réglages</h1>
+        <button
+          className="btn btn-ghost btn-sm"
+          onClick={() => navigate(-1)}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid var(--border)' }}
+        >
+          <ArrowLeft size={16} /> Retour
+        </button>
       </div>
 
       {/* Profile */}

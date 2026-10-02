@@ -1,21 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Receipt, PieChart, Tag, Settings } from 'lucide-react';
+import { Home, BarChart3, Plus, PieChart, Receipt } from 'lucide-react';
 import SyncStatusBar from './SyncStatusBar.jsx';
 import { useSync } from '../context/SyncContext.jsx';
-
-const navItems = [
-  { path: '/', icon: LayoutDashboard, label: 'Accueil' },
-  { path: '/expenses', icon: Receipt, label: 'Dépenses' },
-  { path: '/analytics', icon: PieChart, label: 'Stats' },
-  { path: '/categories', icon: Tag, label: 'Catégories' },
-  { path: '/settings', icon: Settings, label: 'Réglages' },
-];
+import ExpenseModal from './ExpenseModal.jsx';
 
 export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { isOnline, pendingCount, syncStatus } = useSync();
+  const [showAddModal, setShowAddModal] = useState(false);
 
   // Determine sync dot color
   const getSyncDotClass = () => {
@@ -26,6 +20,11 @@ export default function Layout() {
     return 'sync-dot sync-dot--ok';
   };
 
+  const isHomeActive = location.pathname === '/';
+  const isStatsActive = location.pathname.startsWith('/analytics');
+  const isBudgetsActive = location.pathname.startsWith('/categories');
+  const isActivityActive = location.pathname.startsWith('/expenses');
+
   return (
     <div className="app-layout">
       <SyncStatusBar />
@@ -35,23 +34,75 @@ export default function Layout() {
 
       <nav className="bottom-nav" id="main-navigation">
         <span className={getSyncDotClass()} />
-        {navItems.map(({ path, icon: Icon, label }) => {
-          const active = path === '/' ? location.pathname === '/' : location.pathname.startsWith(path);
-          return (
-            <button
-              key={path}
-              className={`nav-item ${active ? 'active' : ''}`}
-              onClick={() => navigate(path)}
-              id={`nav-${label.toLowerCase()}`}
-            >
-              <span className="nav-icon">
-                <Icon size={22} />
-              </span>
-              <span className="nav-label">{label}</span>
-            </button>
-          );
-        })}
+
+        {/* 1. Home */}
+        <button
+          className={`nav-item ${isHomeActive ? 'active' : ''}`}
+          onClick={() => navigate('/')}
+          id="nav-home"
+        >
+          <span className="nav-icon">
+            <Home size={22} strokeWidth={isHomeActive ? 2.5 : 1.8} />
+          </span>
+          <span className="nav-label">Accueil</span>
+        </button>
+
+        {/* 2. Stats */}
+        <button
+          className={`nav-item ${isStatsActive ? 'active' : ''}`}
+          onClick={() => navigate('/analytics')}
+          id="nav-stats"
+        >
+          <span className="nav-icon">
+            <BarChart3 size={22} strokeWidth={isStatsActive ? 2.5 : 1.8} />
+          </span>
+          <span className="nav-label">Stats</span>
+        </button>
+
+        {/* 3. Center Golden FAB */}
+        <button
+          className="bottom-nav-fab"
+          onClick={() => {
+            if (navigator.vibrate) navigator.vibrate(15);
+            setShowAddModal(true);
+          }}
+          id="nav-add-fab"
+          aria-label="Ajouter une transaction"
+        >
+          <Plus size={30} strokeWidth={2.6} />
+        </button>
+
+        {/* 4. Budgets */}
+        <button
+          className={`nav-item ${isBudgetsActive ? 'active' : ''}`}
+          onClick={() => navigate('/categories')}
+          id="nav-budgets"
+        >
+          <span className="nav-icon">
+            <PieChart size={22} strokeWidth={isBudgetsActive ? 2.5 : 1.8} />
+          </span>
+          <span className="nav-label">Budgets</span>
+        </button>
+
+        {/* 5. Activity */}
+        <button
+          className={`nav-item ${isActivityActive ? 'active' : ''}`}
+          onClick={() => navigate('/expenses')}
+          id="nav-activity"
+        >
+          <span className="nav-icon">
+            <Receipt size={22} strokeWidth={isActivityActive ? 2.5 : 1.8} />
+          </span>
+          <span className="nav-label">Activité</span>
+        </button>
       </nav>
+
+      {showAddModal && (
+        <ExpenseModal
+          onClose={() => setShowAddModal(false)}
+          onSaved={() => setShowAddModal(false)}
+        />
+      )}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement } from 'chart.js';
 import { Doughnut, Bar } from 'react-chartjs-2';
-import { PieChart, BarChart3, Calendar, RefreshCw } from 'lucide-react';
+import { PieChart, BarChart3, Calendar, RefreshCw, ChevronRight } from 'lucide-react';
 import { offlineApi as api } from '../utils/offlineApi.js';
 import { useAuth } from '../context/AuthContext';
 import { formatMoney, formatDate, formatDateFull, cycleName, getCurrency, CURRENCIES } from '../utils/format';
@@ -86,27 +86,27 @@ export default function Analytics() {
     datasets: [{
       data: (categoryData.categories || []).map(c => c.total),
       backgroundColor: (categoryData.categories || []).map(c => c.color),
-      borderColor: 'transparent',
-      borderWidth: 0,
-      hoverOffset: 8,
+      borderColor: '#0b131e',
+      borderWidth: 2,
+      hoverOffset: 6,
     }],
   } : null;
 
   const pieOptions = {
     responsive: true,
     maintainAspectRatio: false,
-    cutout: '65%',
+    cutout: '70%',
     animation: { duration: 300 },
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: '#1a1a3e',
-        borderColor: '#2a2a5a',
+        backgroundColor: '#111c2a',
+        borderColor: 'rgba(255, 255, 255, 0.1)',
         borderWidth: 1,
-        titleColor: '#f1f5f9',
+        titleColor: '#ffffff',
         bodyColor: '#94a3b8',
         padding: 12,
-        cornerRadius: 8,
+        cornerRadius: 12,
         callbacks: {
           label: (ctx) => ` ${formatMoney(ctx.raw)} (${categoryData?.categories?.[ctx.dataIndex]?.percentage || 0}%)`,
         },
@@ -119,10 +119,10 @@ export default function Analytics() {
     datasets: [{
       label: 'Dépenses',
       data: history.map(h => h.totalExpenses ?? h.total ?? 0).reverse(),
-      backgroundColor: 'rgba(99, 102, 241, 0.6)',
-      borderColor: '#6366f1',
-      borderWidth: 1,
-      borderRadius: 6,
+      backgroundColor: 'rgba(245, 158, 11, 0.55)',
+      borderColor: '#f59e0b',
+      borderWidth: 1.5,
+      borderRadius: 8,
     }],
   };
 
@@ -133,18 +133,18 @@ export default function Analytics() {
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: '#1a1a3e',
-        borderColor: '#2a2a5a',
+        backgroundColor: '#111c2a',
+        borderColor: 'rgba(255, 255, 255, 0.1)',
         borderWidth: 1,
-        titleColor: '#f1f5f9',
+        titleColor: '#ffffff',
         bodyColor: '#94a3b8',
         padding: 12,
-        cornerRadius: 8,
+        cornerRadius: 12,
         callbacks: { label: (ctx) => ` ${formatMoney(ctx.raw)}` },
       },
     },
     scales: {
-      x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 11 } } },
+      x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 11, weight: 600 } } },
       y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748b', callback: v => `${v}${currencySymbol}` } },
     },
   };
@@ -160,57 +160,94 @@ export default function Analytics() {
     <div className="analytics-container">
       <PullToRefresh pullDistance={pullDistance} isRefreshing={isRefreshing} isReady={isReady} />
 
-      <div className="page-header">
-        <h1 className="page-title">Statistiques</h1>
-        <p className="page-subtitle">{periodLabel}</p>
+      <div className="page-header mb-4">
+        <h1 className="page-title" style={{ fontSize: '2rem', fontWeight: 900 }}>Statistiques</h1>
+        <p className="page-subtitle" style={{ color: 'var(--text-muted)' }}>{periodLabel}</p>
       </div>
 
-      {/* Date Filter */}
-      <div className="card mb-4">
-        <div className="flex items-center gap-2 mb-2">
-          <Calendar size={16} color="var(--primary-light)" />
-          <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>
+      {/* Date Filter Card */}
+      <div className="card mb-4" style={{ background: 'var(--bg-surface)' }}>
+        <div className="flex items-center gap-2 mb-3">
+          <Calendar size={16} color="var(--gold-light)" />
+          <span style={{ fontWeight: 700, fontSize: '0.88rem', color: '#ffffff' }}>
             {useCustomRange ? 'Période personnalisée' : 'Période du cycle en cours'}
           </span>
         </div>
         <div className="flex gap-2">
-          <input className="input" type="date" value={dateRange.startDate} onChange={e => setDateRange(p => ({ ...p, startDate: e.target.value }))} style={{ flex: 1 }} />
-          <input className="input" type="date" value={dateRange.endDate} onChange={e => setDateRange(p => ({ ...p, endDate: e.target.value }))} style={{ flex: 1 }} />
+          <input
+            className="input"
+            type="date"
+            value={dateRange.startDate}
+            onChange={e => setDateRange(p => ({ ...p, startDate: e.target.value }))}
+            style={{ flex: 1, padding: '10px 12px', minHeight: 42, fontSize: '0.85rem' }}
+          />
+          <input
+            className="input"
+            type="date"
+            value={dateRange.endDate}
+            onChange={e => setDateRange(p => ({ ...p, endDate: e.target.value }))}
+            style={{ flex: 1, padding: '10px 12px', minHeight: 42, fontSize: '0.85rem' }}
+          />
         </div>
-        <div className="flex gap-2 mt-2">
-          <button className="btn btn-primary btn-sm" onClick={handleFilter} style={{ flex: 1 }}>Filtrer</button>
-          {useCustomRange && <button className="btn btn-ghost btn-sm" onClick={resetFilter}>Réinitialiser</button>}
+        <div className="flex gap-2 mt-3">
+          <button
+            className="btn btn-sm"
+            onClick={handleFilter}
+            style={{ flex: 1, background: 'linear-gradient(135deg, #f59e0b, #fbbf24)', color: '#0b131e', fontWeight: 800 }}
+          >
+            Filtrer
+          </button>
+          {useCustomRange && (
+            <button className="btn btn-ghost btn-sm" onClick={resetFilter}>
+              Réinitialiser
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Pie Chart */}
-      <div className="chart-container">
-        <div className="chart-title">
-          <PieChart size={18} color="var(--primary-light)" />
+      {/* Pie Chart Card */}
+      <div className="chart-container mb-4" style={{ background: 'var(--bg-surface)' }}>
+        <div className="chart-title" style={{ color: '#ffffff', fontWeight: 800 }}>
+          <PieChart size={18} color="var(--gold-light)" />
           Répartition par catégorie
         </div>
         {loading && !categoryData ? (
           <div className="skeleton" style={{ height: 250, borderRadius: 16 }} />
         ) : categoryData && categoryData.categories && categoryData.categories.length > 0 ? (
           <>
-            <div style={{ height: 250, position: 'relative' }}>
+            <div style={{ height: 240, position: 'relative', margin: '14px 0' }}>
               <Doughnut data={pieData} options={pieOptions} />
               <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>
-                <div style={{ fontSize: '1.4rem', fontWeight: 800 }}>{formatMoney(categoryData.total)}</div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Total</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#ffffff' }}>
+                  {formatMoney(categoryData.total)}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Total dépensé</div>
               </div>
             </div>
-            {/* Legend */}
+
+            {/* Detailed Categories breakdown */}
             <div className="mt-3">
               {categoryData.categories.map(c => (
-                <div key={c.id || 'none'} className="flex items-center justify-between" style={{ padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                  <div className="flex items-center gap-2">
-                    <div style={{ width: 12, height: 12, borderRadius: 3, background: c.color }} />
-                    <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>{c.name}</span>
+                <div
+                  key={c.id || 'none'}
+                  className="flex items-center justify-between"
+                  style={{ padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      style={{
+                        width: 12,
+                        height: 12,
+                        borderRadius: 3,
+                        background: c.color,
+                        boxShadow: `0 0 8px ${c.color}50`,
+                      }}
+                    />
+                    <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#ffffff' }}>{c.name}</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{c.percentage}%</span>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 700 }}>{formatMoney(c.total)}</span>
+                    <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontWeight: 600 }}>{c.percentage}%</span>
+                    <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#ffffff' }}>{formatMoney(c.total)}</span>
                   </div>
                 </div>
               ))}
@@ -222,13 +259,13 @@ export default function Analytics() {
       </div>
 
       {/* Bar Chart - History */}
-      <div className="chart-container">
-        <div className="chart-title">
-          <BarChart3 size={18} color="var(--primary-light)" />
+      <div className="chart-container" style={{ background: 'var(--bg-surface)' }}>
+        <div className="chart-title" style={{ color: '#ffffff', fontWeight: 800 }}>
+          <BarChart3 size={18} color="var(--gold-light)" />
           Historique mensuel
         </div>
         {history.length > 0 ? (
-          <div style={{ height: 250 }}>
+          <div style={{ height: 250, marginTop: 12 }}>
             <Bar data={barData} options={barOptions} />
           </div>
         ) : (
