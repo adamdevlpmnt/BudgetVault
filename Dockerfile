@@ -1,17 +1,17 @@
-# ═══════════════════════════════════════
+# ═══════════════════════════════════════════
 # BudgetVault - Multi-stage Dockerfile
-# ═══════════════════════════════════════
+# ═══════════════════════════════════════════
 
-# Stage 1: Build React frontend
-FROM node:20-alpine AS frontend-build
+# Stage 1: Build React frontend natively on host platform (fast, zero emulation overhead)
+FROM --platform=$BUILDPLATFORM node:20-bookworm-slim AS frontend-build
 WORKDIR /build/client
 COPY client/package*.json ./
 RUN npm ci --no-audit
 COPY client/ ./
 RUN npm run build
 
-# Stage 2: Production server
-FROM node:20-alpine AS production
+# Stage 2: Production server (Debian slim for rock-solid glibc & multi-arch compatibility)
+FROM node:20-bookworm-slim AS production
 WORKDIR /app
 
 # Install server dependencies
@@ -33,7 +33,7 @@ ENV PORT=3001
 
 EXPOSE 3001
 
-# Health check (uses Node.js since wget/curl aren't in alpine)
+# Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD node -e "const http=require('http');const r=http.get('http://localhost:3001/api/health',{timeout:4000},res=>{process.exit(res.statusCode===200?0:1)});r.on('error',()=>process.exit(1));r.on('timeout',()=>{r.destroy();process.exit(1)})"
 
