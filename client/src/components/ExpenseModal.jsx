@@ -210,7 +210,7 @@ export default function ExpenseModal({ categories: propCategories, onClose, onSa
             <span className="modal-currency-tag">{currencySymbol}</span>
           </div>
 
-          {/* Category Dropdown Selector */}
+          {/* Category Selector (Slim bar + Grid of Squares) */}
           {activeTab === 'expense' && categories.length > 0 && (
             <div className="category-select-wrapper mb-3" style={{ position: 'relative' }}>
               <button
@@ -222,25 +222,25 @@ export default function ExpenseModal({ categories: propCategories, onClose, onSa
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  padding: '9px 14px',
-                  borderRadius: 14,
+                  padding: '6px 12px',
+                  borderRadius: 12,
                   background: 'var(--bg-elevated)',
                   border: '1px solid var(--border)',
                   color: 'var(--text)',
                   cursor: 'pointer',
-                  minHeight: 48,
-                  transition: 'border-color 0.2s',
+                  minHeight: 38,
+                  transition: 'all 0.2s ease',
                 }}
               >
                 {(() => {
                   const selCat = categories.find(c => c.id == categoryId) || categories[0];
                   return (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <div
                         style={{
-                          width: 32,
-                          height: 32,
-                          borderRadius: 9,
+                          width: 26,
+                          height: 26,
+                          borderRadius: 7,
                           background: `${selCat?.color || '#6366f1'}25`,
                           color: selCat?.color || '#6366f1',
                           display: 'flex',
@@ -248,16 +248,16 @@ export default function ExpenseModal({ categories: propCategories, onClose, onSa
                           justifyContent: 'center',
                         }}
                       >
-                        <CategoryIcon icon={selCat?.icon} size={18} color={selCat?.color} />
+                        <CategoryIcon icon={selCat?.icon} size={15} color={selCat?.color} />
                       </div>
-                      <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text)' }}>
+                      <span style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text)' }}>
                         {selCat?.name || 'Sélectionner une catégorie'}
                       </span>
                     </div>
                   );
                 })()}
                 <ChevronDown
-                  size={18}
+                  size={16}
                   color="var(--text-muted)"
                   style={{
                     transform: categoryDropdownOpen ? 'rotate(180deg)' : 'none',
@@ -266,29 +266,30 @@ export default function ExpenseModal({ categories: propCategories, onClose, onSa
                 />
               </button>
 
+              {/* Grid of squares (carrés) — hides on selection */}
               {categoryDropdownOpen && (
                 <div
-                  className="category-dropdown-list"
+                  className="category-squares-grid"
                   style={{
-                    position: 'absolute',
-                    top: 'calc(100% + 4px)',
-                    left: 0,
-                    right: 0,
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(4, 1fr)',
+                    gap: 8,
+                    marginTop: 8,
+                    padding: 10,
                     background: 'var(--bg-card)',
                     border: '1px solid var(--border)',
                     borderRadius: 14,
                     boxShadow: 'var(--shadow-lg)',
-                    maxHeight: 220,
+                    maxHeight: 200,
                     overflowY: 'auto',
-                    zIndex: 100,
-                    padding: 6,
                   }}
                 >
                   {categories.map(cat => {
                     const isSelected = categoryId == cat.id;
                     return (
-                      <div
+                      <button
                         key={cat.id}
+                        type="button"
                         onClick={() => {
                           if (navigator.vibrate) navigator.vibrate(8);
                           setCategoryId(cat.id);
@@ -296,36 +297,48 @@ export default function ExpenseModal({ categories: propCategories, onClose, onSa
                         }}
                         style={{
                           display: 'flex',
+                          flexDirection: 'column',
                           alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '8px 12px',
-                          borderRadius: 10,
+                          justifyContent: 'center',
+                          padding: '10px 4px 8px',
+                          borderRadius: 12,
+                          background: isSelected ? 'var(--bg-hover)' : 'var(--bg-elevated)',
+                          border: isSelected ? `2px solid ${cat.color || 'var(--primary)'}` : '1px solid var(--border)',
                           cursor: 'pointer',
-                          background: isSelected ? 'var(--bg-hover)' : 'transparent',
-                          transition: 'background 0.15s',
+                          transition: 'all 0.15s ease',
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <div
-                            style={{
-                              width: 28,
-                              height: 28,
-                              borderRadius: 8,
-                              background: `${cat.color}25`,
-                              color: cat.color,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                            }}
-                          >
-                            <CategoryIcon icon={cat.icon} size={16} color={cat.color} />
-                          </div>
-                          <span style={{ fontSize: '0.9rem', fontWeight: isSelected ? 700 : 500, color: 'var(--text)' }}>
-                            {cat.name}
-                          </span>
+                        <div
+                          style={{
+                            width: 34,
+                            height: 34,
+                            borderRadius: 10,
+                            background: `${cat.color}25`,
+                            color: cat.color,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginBottom: 4,
+                          }}
+                        >
+                          <CategoryIcon icon={cat.icon} size={18} color={cat.color} />
                         </div>
-                        {isSelected && <Check size={16} color="var(--primary)" />}
-                      </div>
+                        <span
+                          style={{
+                            fontSize: '0.72rem',
+                            fontWeight: isSelected ? 700 : 600,
+                            color: 'var(--text)',
+                            textAlign: 'center',
+                            lineHeight: 1.15,
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            maxWidth: '100%',
+                          }}
+                        >
+                          {cat.name}
+                        </span>
+                      </button>
                     );
                   })}
                 </div>

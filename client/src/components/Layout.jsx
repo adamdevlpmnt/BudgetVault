@@ -42,7 +42,7 @@ export default function Layout() {
           id="nav-home"
         >
           <span className="nav-icon">
-            <Home size={22} strokeWidth={isHomeActive ? 2.5 : 1.8} />
+            <Home size={20} strokeWidth={isHomeActive ? 2.4 : 1.8} />
           </span>
           <span className="nav-label">Accueil</span>
         </button>
@@ -54,7 +54,7 @@ export default function Layout() {
           id="nav-stats"
         >
           <span className="nav-icon">
-            <BarChart3 size={22} strokeWidth={isStatsActive ? 2.5 : 1.8} />
+            <BarChart3 size={20} strokeWidth={isStatsActive ? 2.4 : 1.8} />
           </span>
           <span className="nav-label">Stats</span>
         </button>
@@ -69,7 +69,7 @@ export default function Layout() {
           id="nav-add-fab"
           aria-label="Ajouter une transaction"
         >
-          <Plus size={30} strokeWidth={2.6} />
+          <Plus size={26} strokeWidth={2.8} />
         </button>
 
         {/* 4. Budgets */}
@@ -79,7 +79,7 @@ export default function Layout() {
           id="nav-budgets"
         >
           <span className="nav-icon">
-            <PieChart size={22} strokeWidth={isBudgetsActive ? 2.5 : 1.8} />
+            <PieChart size={20} strokeWidth={isBudgetsActive ? 2.4 : 1.8} />
           </span>
           <span className="nav-label">Budgets</span>
         </button>
@@ -91,7 +91,7 @@ export default function Layout() {
           id="nav-activity"
         >
           <span className="nav-icon">
-            <Receipt size={22} strokeWidth={isActivityActive ? 2.5 : 1.8} />
+            <Receipt size={20} strokeWidth={isActivityActive ? 2.4 : 1.8} />
           </span>
           <span className="nav-label">Activité</span>
         </button>

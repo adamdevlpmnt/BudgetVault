@@ -19,7 +19,9 @@ export default function Dashboard() {
   const [summary, setSummary] = useState(null);
   const [recentExpenses, setRecentExpenses] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [showBalance, setShowBalance] = useState(true);
+  const [showBalance, setShowBalance] = useState(() => {
+    return localStorage.getItem('budgetvault-show-balance') === 'true';
+  });
   const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [modalInitialTab, setModalInitialTab] = useState('expense');
   const [showBalanceEdit, setShowBalanceEdit] = useState(false);
@@ -117,7 +119,11 @@ export default function Dashboard() {
   const toggleBalance = (e) => {
     e.stopPropagation();
     if (navigator.vibrate) navigator.vibrate(8);
-    setShowBalance(s => !s);
+    setShowBalance(s => {
+      const next = !s;
+      localStorage.setItem('budgetvault-show-balance', String(next));
+      return next;
+    });
   };
 
   // Get user initials for avatar

@@ -33,9 +33,9 @@ ENV PORT=3001
 
 EXPOSE 3001
 
-# Health check (uses lightweight wget built into Alpine Busybox)
-HEALTHCHECK --interval=60s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget --spider -q http://127.0.0.1:3001/api/health || exit 1
+# Health check (uses Node 20 native fetch, zero dependencies)
+HEALTHCHECK --interval=60s --timeout=5s --start-period=15s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:3001/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 WORKDIR /app/server
 CMD ["node", "index.js"]
