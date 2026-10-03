@@ -7,6 +7,7 @@ import { usePullToRefresh } from '../hooks/usePullToRefresh.js';
 import PullToRefresh from '../components/PullToRefresh.jsx';
 import SegmentedProgressBar from '../components/SegmentedProgressBar.jsx';
 import GoalCard from '../components/GoalCard.jsx';
+import CategoryIcon from '../components/CategoryIcon.jsx';
 import toast from 'react-hot-toast';
 
 const COLORS = [
@@ -305,10 +306,12 @@ export default function Categories() {
                       borderRadius: 10,
                       background: `${cat.color || '#6366f1'}25`,
                       color: cat.color || '#6366f1',
-                      fontSize: '1.1rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
                     }}
                   >
-                    <span>{EMOJI_MAP[cat.icon] || '🏷️'}</span>
+                    <CategoryIcon icon={cat.icon} size={20} color={cat.color || '#6366f1'} />
                   </div>
 
                   <span className={`budget-pct-pill ${pillClass}`}>
@@ -404,10 +407,10 @@ export default function Categories() {
                     key={ic}
                     type="button"
                     className={`category-chip ${catForm.icon === ic ? 'selected' : ''}`}
-                    style={{ padding: '8px 10px', minWidth: 'auto' }}
+                    style={{ padding: '8px 10px', minWidth: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                     onClick={() => setCatForm(f => ({ ...f, icon: ic }))}
                   >
-                    <span style={{ fontSize: '1.2rem' }}>{EMOJI_MAP[ic] || '🏷️'}</span>
+                    <CategoryIcon icon={ic} size={20} color={catForm.icon === ic ? '#ffffff' : 'var(--text-secondary)'} />
                   </button>
                 ))}
               </div>
@@ -538,11 +541,3 @@ export default function Categories() {
     </div>
   );
 }
-
-const EMOJI_MAP = {
-  'shopping-cart':'🛒','car':'🚗','home':'🏠','gamepad-2':'🎮','heart-pulse':'❤️',
-  'shirt':'👕','book-open':'📚','utensils':'🍽️','repeat':'🔄','package':'📦',
-  'tag':'🏷️','coffee':'☕','gift':'🎁','plane':'✈️','music':'🎵','smartphone':'📱',
-  'zap':'⚡','droplet':'💧','baby':'👶','dog':'🐕','dumbbell':'💪','graduation-cap':'🎓',
-  'wrench':'🔧','beef':'🥩','fish':'🐟','apple':'🍎'
-};

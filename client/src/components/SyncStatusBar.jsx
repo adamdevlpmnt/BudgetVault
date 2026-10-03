@@ -12,21 +12,14 @@ export default function SyncStatusBar() {
   const [hideTimeout, setHideTimeout] = useState(null);
 
   useEffect(() => {
-    // Show bar on status changes
-    if (syncStatus === 'syncing' || syncStatus === 'error' || !isOnline || pendingCount > 0) {
+    // Only show bar when offline or when an error occurs.
+    // Normal synchronization runs silently in the background.
+    if (!isOnline || syncStatus === 'error') {
       setVisible(true);
-      if (hideTimeout) clearTimeout(hideTimeout);
-    } else if (syncStatus === 'idle' && isOnline && pendingCount === 0) {
-      // Show "synced" briefly then hide
-      setVisible(true);
-      const t = setTimeout(() => setVisible(false), 3000);
-      setHideTimeout(t);
+    } else {
+      setVisible(false);
     }
-
-    return () => {
-      if (hideTimeout) clearTimeout(hideTimeout);
-    };
-  }, [syncStatus, isOnline, pendingCount]);
+  }, [syncStatus, isOnline]);
 
   const formatLastSync = (timestamp) => {
     if (!timestamp) return 'Jamais';

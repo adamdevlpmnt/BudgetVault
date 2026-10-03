@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement } from 'chart.js';
 import { Doughnut, Bar } from 'react-chartjs-2';
 import { PieChart, BarChart3, Calendar, RefreshCw, ChevronRight } from 'lucide-react';
@@ -20,9 +20,10 @@ export default function Analytics() {
   const [cycleDates, setCycleDates] = useState({ startDate: '', endDate: '' });
   const [dateRange, setDateRange] = useState({ startDate: '', endDate: '' });
   const [useCustomRange, setUseCustomRange] = useState(false);
+  const initialLoadedRef = useRef(false);
 
   const loadData = useCallback(async (params = {}, isInitial = false) => {
-    if (isInitial && !categoryData) setLoading(true);
+    if (isInitial && !initialLoadedRef.current) setLoading(true);
     try {
       const [catData, histData] = await Promise.all([
         api.getByCategory(params),
@@ -30,13 +31,17 @@ export default function Analytics() {
       ]);
       setCategoryData(catData);
       setHistory(Array.isArray(histData) ? histData : (histData?.history || []));
+      initialLoadedRef.current = true;
 
       // Store cycle dates from response
       if (!params.startDate && catData?.startDate && catData?.endDate) {
         setCycleDates({ startDate: catData.startDate, endDate: catData.endDate });
-        if (!useCustomRange) {
-          setDateRange({ startDate: catData.startDate, endDate: catData.endDate });
-        }
+        setDateRange(prev => {
+          if (!prev.startDate) {
+            return { startDate: catData.startDate, endDate: catData.endDate };
+          }
+          return prev;
+        });
       }
     } catch (err) {
       console.warn('[Analytics] loadData error:', err);
@@ -44,10 +49,10 @@ export default function Analytics() {
     } finally {
       setLoading(false);
     }
-  }, [useCustomRange, categoryData]);
+  }, []);
 
   useEffect(() => {
-    loadData({}, true);
+    loadData(useCustomRange ? dateRange : {}, !initialLoadedRef.current);
 
     const unsubSync = syncEvents.on('syncComplete', () => loadData(useCustomRange ? dateRange : {}, false));
     const unsubPending = syncEvents.on('pendingChange', () => loadData(useCustomRange ? dateRange : {}, false));
@@ -81,22 +86,28 @@ export default function Analytics() {
 
   const currencySymbol = CURRENCIES[getCurrency()]?.symbol || '€';
 
-  const pieData = categoryData ? {
-    labels: (categoryData.categories || []).map(c => c.name),
-    datasets: [{
-      data: (categoryData.categories || []).map(c => c.total),
-      backgroundColor: (categoryData.categories || []).map(c => c.color),
-      borderColor: '#0b131e',
-      borderWidth: 2,
-      hoverOffset: 6,
-    }],
-  } : null;
+  const pieData = useMemo(() => {
+    if (!categoryData?.categories?.length) return null;
+    return {
+      labels: categoryData.categories.map(c => c.name),
+      datasets: [{
+        data: categoryData.categories.map(c => c.total),
+        backgroundColor: categoryData.categories.map(c => c.color),
+        borderColor: 'transparent',
+        borderWidth: 2,
+        hoverOffset: 6,
+      }],
+    };
+  }, [categoryData]);
 
-  const pieOptions = {
+  const pieOptions = useMemo(() => ({
     responsive: true,
     maintainAspectRatio: false,
     cutout: '70%',
-    animation: { duration: 300 },
+    animation: {
+      duration: 350,
+      easing: 'easeOutQuad',
+    },
     plugins: {
       legend: { display: false },
       tooltip: {
@@ -112,24 +123,27 @@ export default function Analytics() {
         },
       },
     },
-  };
+  }), [categoryData]);
 
-  const barData = {
+  const barData = useMemo(() => ({
     labels: history.map(h => cycleName(h.cycleKey || h.cycle_key)).reverse(),
     datasets: [{
       label: 'Dépenses',
       data: history.map(h => h.totalExpenses ?? h.total ?? 0).reverse(),
-      backgroundColor: 'rgba(245, 158, 11, 0.55)',
+      backgroundColor: 'rgba(245, 158, 11, 0.65)',
       borderColor: '#f59e0b',
       borderWidth: 1.5,
       borderRadius: 8,
     }],
-  };
+  }), [history]);
 
-  const barOptions = {
+  const barOptions = useMemo(() => ({
     responsive: true,
     maintainAspectRatio: false,
-    animation: { duration: 300 },
+    animation: {
+      duration: 350,
+      easing: 'easeOutQuad',
+    },
     plugins: {
       legend: { display: false },
       tooltip: {
@@ -145,9 +159,9 @@ export default function Analytics() {
     },
     scales: {
       x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 11, weight: 600 } } },
-      y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748b', callback: v => `${v}${currencySymbol}` } },
+      y: { grid: { color: 'rgba(150,150,150,0.1)' }, ticks: { color: '#64748b', callback: v => `${v}${currencySymbol}` } },
     },
-  };
+  }), [currencySymbol]);
 
   // Period label for subtitle
   const periodLabel = useCustomRange
@@ -169,7 +183,7 @@ export default function Analytics() {
       <div className="card mb-4" style={{ background: 'var(--bg-surface)' }}>
         <div className="flex items-center gap-2 mb-3">
           <Calendar size={16} color="var(--gold-light)" />
-          <span style={{ fontWeight: 700, fontSize: '0.88rem', color: '#ffffff' }}>
+          <span style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text)' }}>
             {useCustomRange ? 'Période personnalisée' : 'Période du cycle en cours'}
           </span>
         </div>
@@ -207,7 +221,7 @@ export default function Analytics() {
 
       {/* Pie Chart Card */}
       <div className="chart-container mb-4" style={{ background: 'var(--bg-surface)' }}>
-        <div className="chart-title" style={{ color: '#ffffff', fontWeight: 800 }}>
+        <div className="chart-title" style={{ color: 'var(--text)', fontWeight: 800 }}>
           <PieChart size={18} color="var(--gold-light)" />
           Répartition par catégorie
         </div>
@@ -218,7 +232,7 @@ export default function Analytics() {
             <div style={{ height: 240, position: 'relative', margin: '14px 0' }}>
               <Doughnut data={pieData} options={pieOptions} />
               <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>
-                <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#ffffff' }}>
+                <div style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--text)' }}>
                   {formatMoney(categoryData.total)}
                 </div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Total dépensé</div>
@@ -231,7 +245,7 @@ export default function Analytics() {
                 <div
                   key={c.id || 'none'}
                   className="flex items-center justify-between"
-                  style={{ padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}
+                  style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}
                 >
                   <div className="flex items-center gap-3">
                     <div
@@ -243,11 +257,11 @@ export default function Analytics() {
                         boxShadow: `0 0 8px ${c.color}50`,
                       }}
                     />
-                    <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#ffffff' }}>{c.name}</span>
+                    <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text)' }}>{c.name}</span>
                   </div>
                   <div className="flex items-center gap-3">
                     <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontWeight: 600 }}>{c.percentage}%</span>
-                    <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#ffffff' }}>{formatMoney(c.total)}</span>
+                    <span style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text)' }}>{formatMoney(c.total)}</span>
                   </div>
                 </div>
               ))}
@@ -260,7 +274,7 @@ export default function Analytics() {
 
       {/* Bar Chart - History */}
       <div className="chart-container" style={{ background: 'var(--bg-surface)' }}>
-        <div className="chart-title" style={{ color: '#ffffff', fontWeight: 800 }}>
+        <div className="chart-title" style={{ color: 'var(--text)', fontWeight: 800 }}>
           <BarChart3 size={18} color="var(--gold-light)" />
           Historique mensuel
         </div>

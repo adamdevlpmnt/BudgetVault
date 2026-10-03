@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Edit3, Settings, CreditCard, ArrowDownLeft, ArrowUpRight, Minus, TrendingDown, TrendingUp, Plus, ArrowRight } from 'lucide-react';
+import { Eye, EyeOff, Edit3, Settings, CreditCard, ArrowDownLeft, ArrowUpRight, Minus, TrendingDown, TrendingUp, Plus, ArrowRight, Banknote } from 'lucide-react';
 import { offlineApi as api } from '../utils/offlineApi.js';
 import { formatMoney, formatDate, today } from '../utils/format';
 import { useAuth } from '../context/AuthContext';
@@ -9,6 +9,7 @@ import { usePullToRefresh } from '../hooks/usePullToRefresh.js';
 import PullToRefresh from '../components/PullToRefresh.jsx';
 import ReceiptCard from '../components/ReceiptCard.jsx';
 import ExpenseModal from '../components/ExpenseModal.jsx';
+import CategoryIcon from '../components/CategoryIcon.jsx';
 import toast from 'react-hot-toast';
 
 export default function Dashboard() {
@@ -159,7 +160,7 @@ export default function Dashboard() {
             <div style={{ fontSize: '0.8rem', fontStyle: 'italic', color: 'var(--gold-light)', fontWeight: 500 }}>
               Bonjour,
             </div>
-            <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#ffffff', margin: 0, lineHeight: 1.2 }}>
+            <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text)', margin: 0, lineHeight: 1.2 }}>
               {displayName}
             </h2>
           </div>
@@ -268,7 +269,7 @@ export default function Dashboard() {
               ) : (
                 <TrendingDown size={18} color="#34d399" />
               )}
-              <span style={{ fontWeight: 700, fontSize: '0.88rem', color: '#ffffff' }}>
+              <span style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text)' }}>
                 Bilan comparatif
               </span>
             </div>
@@ -300,7 +301,7 @@ export default function Dashboard() {
 
       {/* Recent Activities Section (wallet.webp) */}
       <div className="flex items-center justify-between mb-3">
-        <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#ffffff', margin: 0 }}>
+        <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text)', margin: 0 }}>
           Activités récentes
         </h3>
         {recentExpenses.length > 0 && (
@@ -344,9 +345,16 @@ export default function Dashboard() {
                   style={{
                     background: isIncome ? 'rgba(16, 185, 129, 0.15)' : `${exp.category_color || '#64748b'}25`,
                     color: isIncome ? '#10b981' : (exp.category_color || '#475569'),
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                   }}
                 >
-                  <span>{isIncome ? '💵' : getCatEmoji(exp.category_icon)}</span>
+                  {isIncome ? (
+                    <Banknote size={18} color="#10b981" />
+                  ) : (
+                    <CategoryIcon icon={exp.category_icon} size={18} color={exp.category_color || '#475569'} />
+                  )}
                 </div>
                 <div className="receipt-item-info">
                   <div className="receipt-item-title">
@@ -410,15 +418,4 @@ export default function Dashboard() {
       )}
     </div>
   );
-}
-
-function getCatEmoji(icon) {
-  const m = {
-    'shopping-cart':'🛒','car':'🚗','home':'🏠','gamepad-2':'🎮','heart-pulse':'❤️',
-    'shirt':'👕','book-open':'📚','utensils':'🍽️','repeat':'🔄','package':'📦',
-    'tag':'🏷️','coffee':'☕','gift':'🎁','plane':'✈️','music':'🎵','smartphone':'📱',
-    'zap':'⚡','droplet':'💧','baby':'👶','dog':'🐕','dumbbell':'💪','graduation-cap':'🎓',
-    'wrench':'🔧','beef':'🥩','fish':'🐟','apple':'🍎'
-  };
-  return m[icon] || '💰';
 }

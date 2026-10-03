@@ -39,6 +39,7 @@ export default function Settings() {
   const [pushEnabled, setPushEnabled] = useState(false);
   const [theme, setTheme] = useState(getStoredTheme());
   const [isManualSyncing, setIsManualSyncing] = useState(false);
+  const [isTestingPush, setIsTestingPush] = useState(false);
 
   const [pwForm, setPwForm] = useState({ current: '', newPw: '', confirm: '' });
   const [recForm, setRecForm] = useState({ type: 'income', amount: '', description: '', dayOfMonth: 1, categoryId: '' });
@@ -155,6 +156,18 @@ export default function Settings() {
           toast.success('Notifications activées');
         } catch { toast.error('Erreur d\'activation'); }
       }
+    }
+  };
+
+  const handleTestPush = async () => {
+    setIsTestingPush(true);
+    try {
+      const res = await api.testPush();
+      toast.success(res?.message || 'Notification envoyée !');
+    } catch (err) {
+      toast.error(err.message || 'Erreur lors de l\'envoi du test');
+    } finally {
+      setIsTestingPush(false);
     }
   };
 
@@ -292,6 +305,19 @@ export default function Settings() {
           </div>
           <button className={`toggle ${pushEnabled ? 'active' : ''}`} onClick={togglePush} />
         </div>
+        {pushEnabled && (
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end' }}>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={handleTestPush}
+              disabled={isTestingPush}
+              style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 6 }}
+            >
+              <Bell size={14} />
+              {isTestingPush ? 'Envoi...' : 'Tester la notification'}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Recurring */}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Search, X, Trash2, Camera, ArrowDownCircle, ArrowUpCircle } from 'lucide-react';
+import { Search, X, Trash2, Camera, ArrowDownCircle, ArrowUpCircle, Banknote } from 'lucide-react';
 import { offlineApi as api } from '../utils/offlineApi.js';
 import { formatMoney, formatDate, today } from '../utils/format';
 import { sync, syncEvents } from '../utils/syncEngine.js';
@@ -7,6 +7,7 @@ import { usePullToRefresh } from '../hooks/usePullToRefresh.js';
 import PullToRefresh from '../components/PullToRefresh.jsx';
 import ReceiptCard from '../components/ReceiptCard.jsx';
 import ExpenseModal from '../components/ExpenseModal.jsx';
+import CategoryIcon from '../components/CategoryIcon.jsx';
 import toast from 'react-hot-toast';
 
 export default function Expenses() {
@@ -195,8 +196,9 @@ export default function Expenses() {
             onClick={() => {
               setFilterCat(filterCat == c.id ? '' : c.id);
             }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
           >
-            <span>{getCatEmoji(c.icon)}</span>
+            <CategoryIcon icon={c.icon} size={15} color={filterCat == c.id ? '#ffffff' : (c.color || 'var(--text-secondary)')} />
             <span>{c.name}</span>
           </button>
         ))}
@@ -214,7 +216,7 @@ export default function Expenses() {
       ) : groupedByDate.length === 0 ? (
         <div className="card text-center py-6" style={{ background: 'var(--bg-surface)' }}>
           <Search size={40} color="var(--text-muted)" style={{ margin: '0 auto 12px' }} />
-          <p style={{ fontWeight: 700, fontSize: '1rem', color: '#ffffff' }}>Aucune transaction trouvée</p>
+          <p style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text)' }}>Aucune transaction trouvée</p>
           <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: 4 }}>
             {searchQuery ? 'Modifiez votre mot-clé de recherche' : 'Appuyez sur le bouton + pour en ajouter une !'}
           </p>
@@ -267,9 +269,16 @@ export default function Expenses() {
                       style={{
                         background: isIncome ? 'rgba(16, 185, 129, 0.15)' : `${exp.category_color || '#64748b'}25`,
                         color: isIncome ? '#10b981' : (exp.category_color || '#475569'),
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
                       }}
                     >
-                      <span>{isIncome ? '💵' : getCatEmoji(exp.category_icon)}</span>
+                      {isIncome ? (
+                        <Banknote size={18} color="#10b981" />
+                      ) : (
+                        <CategoryIcon icon={exp.category_icon} size={18} color={exp.category_color || '#475569'} />
+                      )}
                     </div>
 
                     {/* Info */}
@@ -342,15 +351,4 @@ export default function Expenses() {
       )}
     </div>
   );
-}
-
-function getCatEmoji(icon) {
-  const m = {
-    'shopping-cart':'🛒','car':'🚗','home':'🏠','gamepad-2':'🎮','heart-pulse':'❤️',
-    'shirt':'👕','book-open':'📚','utensils':'🍽️','repeat':'🔄','package':'📦',
-    'tag':'🏷️','coffee':'☕','gift':'🎁','plane':'✈️','music':'🎵','smartphone':'📱',
-    'zap':'⚡','droplet':'💧','baby':'👶','dog':'🐕','dumbbell':'💪','graduation-cap':'🎓',
-    'wrench':'🔧','beef':'🥩','fish':'🐟','apple':'🍎'
-  };
-  return m[icon] || '💰';
 }

@@ -658,6 +658,7 @@ export const offlineApi = {
   getVapidKey: () => api.getVapidKey(),
   subscribePush: (...args) => api.subscribePush(...args),
   unsubscribePush: () => api.unsubscribePush(),
+  testPush: () => api.testPush(),
 };
 
 // ==================== LOCAL ANALYTICS COMPUTATION ====================

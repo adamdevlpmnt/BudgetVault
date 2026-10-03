@@ -51,14 +51,20 @@ export default function App() {
         <AppRoutes />
         <Toaster
           position="top-center"
+          containerStyle={{
+            top: 56,
+            zIndex: 999999,
+          }}
           toastOptions={{
-            duration: 3000,
+            duration: 3500,
             style: {
               background: 'var(--bg-card)',
               color: 'var(--text)',
               border: '1px solid var(--border)',
               borderRadius: '12px',
               fontSize: '0.9rem',
+              fontWeight: 600,
+              boxShadow: '0 8px 30px rgba(0, 0, 0, 0.25)',
             },
           }}
         />

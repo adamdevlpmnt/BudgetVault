@@ -17,6 +17,14 @@ initDatabase();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Trust reverse proxy (TrueNAS, Traefik, Docker, Nginx) for accurate IP resolution
+app.set('trust proxy', 1);
+
+// Health check (must be before rateLimiter so container health probes are never blocked)
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 // Security & compression middleware
 app.use(helmet({
   contentSecurityPolicy: false,
@@ -28,11 +36,6 @@ app.use(express.json({ limit: '10mb' }));
 
 // Rate limiting on all API routes
 app.use('/api', apiLimiter);
-
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
 
 // Auth routes — login is public, other auth routes require auth middleware
 const authRouter = require('./routes/auth');

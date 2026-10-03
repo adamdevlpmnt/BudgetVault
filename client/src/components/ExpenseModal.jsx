@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Camera, ZoomIn, Calendar, Repeat, Check, Banknote, CreditCard, Landmark } from 'lucide-react';
+import { X, Camera, ZoomIn, Calendar, Repeat, Check, ChevronDown } from 'lucide-react';
 import { offlineApi as api } from '../utils/offlineApi.js';
 import { today, getCurrency, CURRENCIES } from '../utils/format';
 import Keypad from './Keypad.jsx';
+import CategoryIcon from './CategoryIcon.jsx';
 import toast from 'react-hot-toast';
 
 export default function ExpenseModal({ categories: propCategories, onClose, onSaved, expense }) {
@@ -15,7 +16,7 @@ export default function ExpenseModal({ categories: propCategories, onClose, onSa
   const [note, setNote] = useState(expense?.note || '');
   const [date, setDate] = useState(expense?.date || today());
   const [categoryId, setCategoryId] = useState(expense?.category_id || '');
-  const [paymentMethod, setPaymentMethod] = useState('Cash'); // 'Cash' | 'Card' | 'Transfer'
+  const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
   const [repeatMonthly, setRepeatMonthly] = useState(false);
   const [receiptImage, setReceiptImage] = useState(expense?.receipt_image || null);
   const [uploading, setUploading] = useState(false);
@@ -117,16 +118,10 @@ export default function ExpenseModal({ categories: propCategories, onClose, onSa
     try {
       if (navigator.vibrate) navigator.vibrate(15);
 
-      // Build note combining payment method if specified
-      let finalNote = note.trim();
-      if (paymentMethod && !finalNote.includes(`[${paymentMethod}]`)) {
-        finalNote = finalNote ? `${finalNote} • ${paymentMethod}` : paymentMethod;
-      }
-
       const data = {
         amount: numAmount,
         description: description.trim() || (activeTab === 'income' ? 'Revenu' : 'Dépense'),
-        note: finalNote,
+        note: note.trim(),
         date,
         categoryId: activeTab === 'expense' ? (categoryId || null) : null,
         receiptImage: activeTab === 'expense' ? receiptImage : null,
@@ -151,7 +146,10 @@ export default function ExpenseModal({ categories: propCategories, onClose, onSa
         }
       }
 
-      toast.success(isEditing ? 'Entrée modifiée' : (activeTab === 'income' ? 'Revenu enregistré' : 'Dépense enregistrée'));
+      const successMsg = isEditing
+        ? 'Opération modifiée avec succès !'
+        : (activeTab === 'income' ? 'Revenu enregistré avec succès !' : 'Dépense enregistrée avec succès !');
+      toast.success(successMsg, { id: 'expense-save', duration: 3500 });
       if (onSaved) onSaved(activeTab);
     } catch (err) {
       toast.error(err.message || 'Erreur lors de l’enregistrement');
@@ -212,61 +210,128 @@ export default function ExpenseModal({ categories: propCategories, onClose, onSa
             <span className="modal-currency-tag">{currencySymbol}</span>
           </div>
 
-          {/* Category Squircles (add.webp) */}
+          {/* Category Dropdown Selector */}
           {activeTab === 'expense' && categories.length > 0 && (
-            <div className="category-squircles-row">
-              {categories.map(cat => {
-                const isSelected = categoryId == cat.id;
-                return (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    className={`category-squircle-btn ${isSelected ? 'active' : ''}`}
-                    onClick={() => {
-                      if (navigator.vibrate) navigator.vibrate(8);
-                      setCategoryId(cat.id);
-                    }}
-                  >
-                    <div
-                      className="squircle-badge"
-                      style={{
-                        background: isSelected ? cat.color : `${cat.color}25`,
-                        color: isSelected ? '#ffffff' : cat.color,
-                      }}
-                    >
-                      <span>{getCatEmoji(cat.icon)}</span>
+            <div className="category-select-wrapper mb-3" style={{ position: 'relative' }}>
+              <button
+                type="button"
+                className="category-dropdown-btn"
+                onClick={() => setCategoryDropdownOpen(o => !o)}
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '9px 14px',
+                  borderRadius: 14,
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text)',
+                  cursor: 'pointer',
+                  minHeight: 48,
+                  transition: 'border-color 0.2s',
+                }}
+              >
+                {(() => {
+                  const selCat = categories.find(c => c.id == categoryId) || categories[0];
+                  return (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div
+                        style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: 9,
+                          background: `${selCat?.color || '#6366f1'}25`,
+                          color: selCat?.color || '#6366f1',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <CategoryIcon icon={selCat?.icon} size={18} color={selCat?.color} />
+                      </div>
+                      <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text)' }}>
+                        {selCat?.name || 'Sélectionner une catégorie'}
+                      </span>
                     </div>
-                    <span>{cat.name}</span>
-                  </button>
-                );
-              })}
+                  );
+                })()}
+                <ChevronDown
+                  size={18}
+                  color="var(--text-muted)"
+                  style={{
+                    transform: categoryDropdownOpen ? 'rotate(180deg)' : 'none',
+                    transition: 'transform 0.2s ease',
+                  }}
+                />
+              </button>
+
+              {categoryDropdownOpen && (
+                <div
+                  className="category-dropdown-list"
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 4px)',
+                    left: 0,
+                    right: 0,
+                    background: 'var(--bg-card)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 14,
+                    boxShadow: 'var(--shadow-lg)',
+                    maxHeight: 220,
+                    overflowY: 'auto',
+                    zIndex: 100,
+                    padding: 6,
+                  }}
+                >
+                  {categories.map(cat => {
+                    const isSelected = categoryId == cat.id;
+                    return (
+                      <div
+                        key={cat.id}
+                        onClick={() => {
+                          if (navigator.vibrate) navigator.vibrate(8);
+                          setCategoryId(cat.id);
+                          setCategoryDropdownOpen(false);
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '8px 12px',
+                          borderRadius: 10,
+                          cursor: 'pointer',
+                          background: isSelected ? 'var(--bg-hover)' : 'transparent',
+                          transition: 'background 0.15s',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <div
+                            style={{
+                              width: 28,
+                              height: 28,
+                              borderRadius: 8,
+                              background: `${cat.color}25`,
+                              color: cat.color,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            <CategoryIcon icon={cat.icon} size={16} color={cat.color} />
+                          </div>
+                          <span style={{ fontSize: '0.9rem', fontWeight: isSelected ? 700 : 500, color: 'var(--text)' }}>
+                            {cat.name}
+                          </span>
+                        </div>
+                        {isSelected && <Check size={16} color="var(--primary)" />}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
-
-          {/* Payment Method Selector (Cash, Carte, Virement) */}
-          <div className="payment-methods-row">
-            <button
-              type="button"
-              className={`payment-method-chip ${paymentMethod === 'Cash' ? 'active' : ''}`}
-              onClick={() => setPaymentMethod('Cash')}
-            >
-              <Banknote size={16} /> Espèces
-            </button>
-            <button
-              type="button"
-              className={`payment-method-chip ${paymentMethod === 'Card' ? 'active' : ''}`}
-              onClick={() => setPaymentMethod('Card')}
-            >
-              <CreditCard size={16} /> Carte
-            </button>
-            <button
-              type="button"
-              className={`payment-method-chip ${paymentMethod === 'Transfer' ? 'active' : ''}`}
-              onClick={() => setPaymentMethod('Transfer')}
-            >
-              <Landmark size={16} /> Virement
-            </button>
-          </div>
 
           {/* Description & Note Input */}
           <div className="flex gap-2 mb-2">
@@ -374,15 +439,4 @@ export default function ExpenseModal({ categories: propCategories, onClose, onSa
       )}
     </>
   );
-}
-
-function getCatEmoji(icon) {
-  const m = {
-    'shopping-cart':'🛒','car':'🚗','home':'🏠','gamepad-2':'🎮','heart-pulse':'❤️',
-    'shirt':'👕','book-open':'📚','utensils':'🍽️','repeat':'🔄','package':'📦',
-    'tag':'🏷️','coffee':'☕','gift':'🎁','plane':'✈️','music':'🎵','smartphone':'📱',
-    'zap':'⚡','droplet':'💧','baby':'👶','dog':'🐕','dumbbell':'💪','graduation-cap':'🎓',
-    'wrench':'🔧','beef':'🥩','fish':'🐟','apple':'🍎'
-  };
-  return m[icon] || '💰';
 }
